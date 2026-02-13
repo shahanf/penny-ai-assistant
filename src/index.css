@@ -1,0 +1,343 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Default Penny cursor when Penny is processing (replaces mouse cursor) */
+.penny-thinking-cursor,
+.penny-thinking-cursor * {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23fbbf24'/%3E%3Cstop offset='100%25' stop-color='%23b45309'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='14' fill='url(%23g)'/%3E%3Ccircle cx='16' cy='16' r='14' fill='none' stroke='%2392400e' stroke-width='1.5'/%3E%3Cellipse cx='11' cy='13' rx='2.5' ry='3' fill='white'/%3E%3Cellipse cx='21' cy='13' rx='2.5' ry='3' fill='white'/%3E%3Ccircle cx='11.5' cy='13.5' r='1.2' fill='%231f2937'/%3E%3Ccircle cx='21.5' cy='13.5' r='1.2' fill='%231f2937'/%3E%3C/svg%3E") 16 16, wait !important;
+}
+
+/* Penny Search Bar Glow Animation */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(168, 85, 247, 0.4), 0 0 30px rgba(168, 85, 247, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(168, 85, 247, 0.6), 0 0 50px rgba(168, 85, 247, 0.3);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Penny Spotlight Modal Animation */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.3s ease-out forwards;
+}
+
+/* Confetti Animation */
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(400px) rotate(720deg);
+  }
+}
+
+.animate-confetti-fall {
+  animation: confetti-fall 2s ease-out forwards;
+}
+
+/* Penny Entrance Animations */
+
+/* Walk in from left */
+@keyframes penny-walk-in {
+  0% {
+    opacity: 0;
+    transform: translateX(-100px);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-penny-walk-in {
+  animation: penny-walk-in 2s ease-out forwards;
+}
+
+/* Walk in from right */
+@keyframes penny-walk-right-in {
+  0% {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-penny-walk-right-in {
+  animation: penny-walk-right-in 2s ease-out forwards;
+}
+
+/* Parachute drop from top */
+@keyframes penny-parachute-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-150px);
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes parachute-sway {
+  0% {
+    transform: translateY(-150px) rotate(-5deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  25% {
+    transform: translateY(-100px) rotate(5deg);
+  }
+  50% {
+    transform: translateY(-50px) rotate(-3deg);
+  }
+  75% {
+    transform: translateY(-25px) rotate(3deg);
+  }
+  100% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.animate-penny-parachute-in {
+  animation: parachute-sway 1.5s ease-out forwards;
+}
+
+/* Parachute detach and float away */
+@keyframes parachute-detach {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: translateY(-20px) scale(0.8) rotate(10deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-60px) scale(0.4) rotate(25deg);
+  }
+}
+
+.animate-parachute-detach {
+  animation: parachute-detach 0.6s ease-out forwards;
+}
+
+/* Umbrella float down */
+@keyframes penny-umbrella {
+  0% {
+    opacity: 0;
+    transform: translateY(-120px) rotate(-10deg);
+  }
+  15% {
+    opacity: 1;
+  }
+  25% {
+    transform: translateY(-80px) rotate(8deg);
+  }
+  50% {
+    transform: translateY(-40px) rotate(-6deg);
+  }
+  75% {
+    transform: translateY(-15px) rotate(4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+}
+
+.animate-penny-umbrella {
+  animation: penny-umbrella 1.8s ease-out forwards;
+}
+
+/* Scooter ride in from left */
+@keyframes penny-scooter-in {
+  0% {
+    opacity: 0;
+    transform: translateX(-150px);
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    transform: translateX(5px);
+  }
+  92% {
+    transform: translateX(-3px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-penny-scooter-in {
+  animation: penny-scooter-in 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* Bounce entrance (simple fallback) */
+@keyframes penny-bounce-in {
+  0% {
+    opacity: 0;
+    transform: scale(0) translateY(-50px);
+  }
+  50% {
+    transform: scale(1.1) translateY(10px);
+  }
+  70% {
+    transform: scale(0.95) translateY(-5px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-penny-bounce-in {
+  animation: penny-bounce-in 0.8s ease-out forwards;
+}
+
+/* Bank vault exit - Penny steps out */
+@keyframes penny-vault-in {
+  0% {
+    opacity: 0;
+    transform: translateX(-50px) scale(0.9);
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.animate-penny-vault-in {
+  animation: penny-vault-in 2.2s ease-out forwards;
+}
+
+@keyframes vault-door-open {
+  0% {
+    transform: perspective(200px) rotateY(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: perspective(200px) rotateY(-90deg);
+    opacity: 0.6;
+  }
+}
+
+.animate-vault-door-open {
+  animation: vault-door-open 0.8s ease-out forwards;
+}
+
+/* Red car drive in from right */
+@keyframes penny-car-in {
+  0% {
+    opacity: 0;
+    transform: translateX(140px);
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    transform: translateX(8px);
+  }
+  92% {
+    transform: translateX(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-penny-car-in {
+  animation: penny-car-in 1.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* Parasail descend from top */
+@keyframes penny-parasail-in {
+  0% {
+    transform: translateY(-140px) rotate(-8deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  30% {
+    transform: translateY(-90px) rotate(5deg);
+  }
+  50% {
+    transform: translateY(-45px) rotate(-4deg);
+  }
+  70% {
+    transform: translateY(-15px) rotate(3deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+}
+
+.animate-penny-parasail-in {
+  animation: penny-parasail-in 1.6s ease-out forwards;
+}
+
+@keyframes parasail-detach {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-80px) scale(0.6) rotate(15deg);
+  }
+}
+
+.animate-parasail-detach {
+  animation: parasail-detach 0.7s ease-out forwards;
+}
+
