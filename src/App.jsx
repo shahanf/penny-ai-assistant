@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { BrowserRouter as Router, useNavigate } from 'react-router-dom'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 import { PennyChatProvider } from './context/PennyChatContext'
 import PennyAvatar from './components/PennyAvatar'
 import PennyMessage from './components/penny/PennyMessage'
@@ -757,6 +758,7 @@ function App() {
     <PennyChatProvider>
       <Router>
         <PennyInterface />
+        <SpeedInsights />
       </Router>
     </PennyChatProvider>
   )
