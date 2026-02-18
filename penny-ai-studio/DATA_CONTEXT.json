@@ -1,0 +1,88 @@
+{
+  "adoption": {
+    "eligible": 2643,
+    "enrolled": 1012,
+    "enrolling": 29,
+    "notEnrolled": 1602,
+    "adoptionRate": 38
+  },
+  "transfers": {
+    "count": 25,
+    "totalAmount": 4915,
+    "instantCount": 14,
+    "standardCount": 11,
+    "totalFees": 46.06,
+    "avgAmount": 196.60
+  },
+  "savings": {
+    "totalAccounts": 378,
+    "totalSaved": 45230,
+    "avgPerEmployee": 119.66
+  },
+  "outstandingBalance": {
+    "total": 996.90,
+    "employees": [
+      { "name": "Michael Chen", "department": "Engineering", "amount": 125.50, "dueDate": "2026-02-15" },
+      { "name": "James Wilson", "department": "Sales", "amount": 89.25, "dueDate": "2026-02-14" },
+      { "name": "Jessica Brown", "department": "Retail", "amount": 245.00, "dueDate": "2026-02-28" },
+      { "name": "Stephanie White", "department": "Marketing", "amount": 67.80, "dueDate": "2026-02-10" },
+      { "name": "Brandon Thomas", "department": "Logistics", "amount": 312.45, "dueDate": "2026-02-20" },
+      { "name": "Justin Lewis", "department": "Sales", "amount": 156.90, "dueDate": "2026-02-18" }
+    ]
+  },
+  "supportTickets": [
+    { "id": "TKT-001", "title": "Missing paycheck deposit", "status": "In Progress", "employee": "Michael Chen", "priority": "High", "createdAt": "2026-01-28" },
+    { "id": "TKT-002", "title": "Unable to access savings account", "status": "Pending", "employee": "Jessica Brown", "priority": "Medium", "createdAt": "2026-01-27" },
+    { "id": "TKT-003", "title": "Transfer not showing in bank", "status": "In Progress", "employee": "Stephanie White", "priority": "High", "createdAt": "2026-01-26" }
+  ],
+  "satisfaction": {
+    "overallSatisfaction": 4.7,
+    "totalResponses": 892,
+    "easeOfUse": 4.8,
+    "financialWellbeing": 4.5,
+    "recommendationScore": 4.6,
+    "supportQuality": 4.4
+  },
+  "employees": [
+    { "id": 1, "name": "Sarah Johnson", "department": "Operations", "location": "New York", "status": "Enrolled", "transferCount": 8, "transferAmount": "$450.00", "outstandingBalance": "$0.00", "saveBalance": "$1,245.00", "hasSaveAccount": true, "hasSupportTicket": false },
+    { "id": 2, "name": "Michael Chen", "department": "Engineering", "location": "Los Angeles", "status": "Enrolled", "transferCount": 15, "transferAmount": "$1,200.00", "outstandingBalance": "$125.50", "saveBalance": "$3,420.00", "hasSaveAccount": true, "hasSupportTicket": true },
+    { "id": 3, "name": "Emily Rodriguez", "department": "Customer Service", "location": "Chicago", "status": "Enrolled", "transferCount": 5, "transferAmount": "$320.00", "outstandingBalance": "$0.00", "saveBalance": "$0.00", "hasSaveAccount": false, "hasSupportTicket": false },
+    { "id": 4, "name": "James Wilson", "department": "Sales", "location": "Houston", "status": "Eligible", "transferCount": 0, "transferAmount": "$0.00", "outstandingBalance": "$89.25", "saveBalance": "$0.00", "hasSaveAccount": false, "hasSupportTicket": false },
+    { "id": 5, "name": "Ashley Martinez", "department": "Warehouse", "location": "Phoenix", "status": "Paused", "transferCount": 12, "transferAmount": "$675.00", "outstandingBalance": "$0.00", "saveBalance": "$2,100.00", "hasSaveAccount": true, "hasSupportTicket": false },
+    { "id": 6, "name": "David Thompson", "department": "Management", "location": "Philadelphia", "status": "Enrolled", "transferCount": 10, "transferAmount": "$890.00", "outstandingBalance": "$0.00", "saveBalance": "$5,400.00", "hasSaveAccount": true, "hasSupportTicket": false },
+    { "id": 7, "name": "Jessica Brown", "department": "Retail", "location": "San Antonio", "status": "Disabled", "transferCount": 0, "transferAmount": "$0.00", "outstandingBalance": "$245.00", "saveBalance": "$0.00", "hasSaveAccount": false, "hasSupportTicket": true },
+    { "id": 8, "name": "Christopher Lee", "department": "IT", "location": "San Diego", "status": "Enrolled", "transferCount": 14, "transferAmount": "$1,100.00", "outstandingBalance": "$0.00", "saveBalance": "$4,200.00", "hasSaveAccount": true, "hasSupportTicket": false },
+    { "id": 9, "name": "Amanda Garcia", "department": "HR", "location": "Dallas", "status": "Enrolled", "transferCount": 9, "transferAmount": "$520.00", "outstandingBalance": "$0.00", "saveBalance": "$450.00", "hasSaveAccount": true, "hasSupportTicket": false },
+    { "id": 10, "name": "Daniel Harris", "department": "Finance", "location": "San Jose", "status": "Eligible", "transferCount": 0, "transferAmount": "$0.00", "outstandingBalance": "$0.00", "saveBalance": "$0.00", "hasSaveAccount": false, "hasSupportTicket": false },
+    { "id": 11, "name": "Stephanie White", "department": "Marketing", "location": "Austin", "status": "Enrolled", "transferCount": 11, "transferAmount": "$780.00", "outstandingBalance": "$67.80", "saveBalance": "$920.00", "hasSaveAccount": true, "hasSupportTicket": true },
+    { "id": 12, "name": "Kevin Anderson", "department": "Operations", "location": "Jacksonville", "status": "Enrolled", "transferCount": 18, "transferAmount": "$1,450.00", "outstandingBalance": "$0.00", "saveBalance": "$8,900.00", "hasSaveAccount": true, "hasSupportTicket": false },
+    { "id": 13, "name": "Nicole Taylor", "department": "Customer Service", "location": "Fort Worth", "status": "Enrolled", "transferCount": 7, "transferAmount": "$410.00", "outstandingBalance": "$0.00", "saveBalance": "$780.00", "hasSaveAccount": true, "hasSupportTicket": false },
+    { "id": 14, "name": "Brandon Thomas", "department": "Logistics", "location": "Columbus", "status": "Disabled", "transferCount": 0, "transferAmount": "$0.00", "outstandingBalance": "$312.45", "saveBalance": "$0.00", "hasSaveAccount": false, "hasSupportTicket": false },
+    { "id": 15, "name": "Rachel Jackson", "department": "Warehouse", "location": "Charlotte", "status": "Enrolled", "transferCount": 8, "transferAmount": "$590.00", "outstandingBalance": "$0.00", "saveBalance": "$1,120.00", "hasSaveAccount": true, "hasSupportTicket": false },
+    { "id": 16, "name": "Tyler Moore", "department": "Engineering", "location": "Indianapolis", "status": "Enrolled", "transferCount": 13, "transferAmount": "$980.00", "outstandingBalance": "$0.00", "saveBalance": "$320.00", "hasSaveAccount": true, "hasSupportTicket": false },
+    { "id": 17, "name": "Megan Clark", "department": "Design", "location": "San Francisco", "status": "Enrolled", "transferCount": 10, "transferAmount": "$820.00", "outstandingBalance": "$0.00", "saveBalance": "$3,200.00", "hasSaveAccount": true, "hasSupportTicket": false },
+    { "id": 18, "name": "Justin Lewis", "department": "Sales", "location": "Seattle", "status": "Paused", "transferCount": 0, "transferAmount": "$0.00", "outstandingBalance": "$156.90", "saveBalance": "$780.00", "hasSaveAccount": true, "hasSupportTicket": false },
+    { "id": 19, "name": "Lauren Walker", "department": "Retail", "location": "Denver", "status": "Enrolled", "transferCount": 6, "transferAmount": "$380.00", "outstandingBalance": "$0.00", "saveBalance": "$450.00", "hasSaveAccount": true, "hasSupportTicket": false },
+    { "id": 20, "name": "Ryan Hall", "department": "Management", "location": "Boston", "status": "Enrolled", "transferCount": 20, "transferAmount": "$1,680.00", "outstandingBalance": "$0.00", "saveBalance": "$12,450.00", "hasSaveAccount": true, "hasSupportTicket": false }
+  ],
+  "reports": [
+    { "id": "transfers", "name": "Transfers Report", "description": "All transfers, fees, and methods" },
+    { "id": "savings", "name": "Save Accounts Report", "description": "Account balances and trends" },
+    { "id": "reconciliation", "name": "Reconciliation Report", "description": "Payroll reconciliation data" },
+    { "id": "outstanding", "name": "Outstanding Balances Report", "description": "Employees with outstanding balances" },
+    { "id": "feedback", "name": "Employee Feedback Report", "description": "Satisfaction scores and feedback" },
+    { "id": "impact", "name": "Total Impact Report", "description": "ROI and financial wellness impact" }
+  ],
+  "navigation": {
+    "/": "Home",
+    "/employees": "Employees",
+    "/transfers": "Transfers",
+    "/savings": "Savings",
+    "/adoption-usage": "Adoption & Usage",
+    "/impact-stats": "Impact Stats",
+    "/downloads": "Reports",
+    "/shifts-pay": "Shifts & Pay",
+    "/designed-assets": "Design Assets",
+    "/settings": "Settings"
+  }
+}

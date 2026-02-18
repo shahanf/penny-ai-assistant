@@ -1,0 +1,173 @@
+# Test Queries for Penny AI
+# Copy and paste these into Google AI Studio to test your changes
+
+# ==========================================
+# GREETINGS & HELP
+# ==========================================
+Hi
+Hello
+Hey there
+Good morning
+What can you do?
+Help
+Help me
+
+# ==========================================
+# OUTSTANDING BALANCE QUERIES
+# ==========================================
+What's the total outstanding balance?
+How much is owed?
+Who owes money?
+Any unpaid balances?
+Show me outstanding balances
+Total amount due
+Which employees have debt?
+List employees with balances due
+What's the outstanding amount this pay cycle?
+
+# ==========================================
+# EMPLOYEE-SPECIFIC BALANCE QUERIES
+# ==========================================
+Does Sarah Johnson owe anything?
+Check Michael Chen's balance
+What's Stephanie White's outstanding balance?
+How much does Brandon Thomas owe?
+Is there a balance for Jessica Brown?
+Look up James Wilson's debt
+
+# ==========================================
+# ENROLLMENT STATUS QUERIES
+# ==========================================
+Is Sarah Johnson enrolled?
+Check Michael Chen's status
+Is Emily Rodriguez signed up?
+Has James Wilson enrolled?
+What's Ashley Martinez's enrollment status?
+Is Jessica Brown participating?
+Is Daniel Harris using EWA?
+
+# ==========================================
+# EMPLOYEE LOOKUP QUERIES
+# ==========================================
+Look up Sarah Johnson
+Find Michael Chen
+Get info on Emily Rodriguez
+Tell me about Kevin Anderson
+Search for Ryan Hall
+Employee info for Megan Clark
+
+# ==========================================
+# TRANSFER STATISTICS QUERIES
+# ==========================================
+How many transfers this month?
+Show transfer stats
+What's the total transferred?
+Transfer statistics this pay cycle
+How much was transferred?
+Show me EWA usage
+What's the average transfer amount?
+Instant vs standard transfers breakdown
+
+# ==========================================
+# ADOPTION & ENROLLMENT STATS
+# ==========================================
+What's our adoption rate?
+How many employees are enrolled?
+Show enrollment stats
+Adoption statistics
+How many people signed up?
+What percentage have adopted EWA?
+Current enrollment numbers
+
+# ==========================================
+# SAVINGS QUERIES
+# ==========================================
+How much have employees saved?
+Total savings
+How many savings accounts?
+Show savings stats
+Who are the top savers?
+Average savings per employee
+Savings account statistics
+
+# ==========================================
+# SUPPORT TICKET QUERIES
+# ==========================================
+Any open tickets?
+Show support tickets
+Is there a ticket about missed salary?
+Pending support issues
+Open support requests
+Any payroll issues?
+Support ticket status
+
+# ==========================================
+# REPORT QUERIES
+# ==========================================
+I need a transfers report
+What reports are available?
+Generate a savings report
+Download outstanding balances report
+Get me an impact report
+Export employee feedback data
+Create a reconciliation report
+
+# ==========================================
+# NAVIGATION QUERIES
+# ==========================================
+Take me to employees
+Go to transfers page
+Open the savings page
+Navigate to adoption & usage
+Show me impact stats
+Go to reports
+Open settings
+
+# ==========================================
+# SATISFACTION & IMPACT QUERIES
+# ==========================================
+What's the satisfaction score?
+How are employees feeling?
+Show impact stats
+Employee feedback scores
+Satisfaction ratings
+Financial wellbeing score
+Recommendation score
+
+# ==========================================
+# EMPLOYEE COUNT QUERIES
+# ==========================================
+How many employees?
+Total number of employees
+Show employee count
+List all employees
+How many people on the team?
+
+# ==========================================
+# TREND & COMPARISON QUERIES
+# ==========================================
+Show adoption trends
+How has enrollment changed?
+Compare this month to last month
+What's trending?
+Growth over time
+
+# ==========================================
+# ACKNOWLEDGMENTS
+# ==========================================
+Thanks
+Thank you
+Great, thanks!
+Perfect
+Got it
+OK
+
+# ==========================================
+# EDGE CASES / SHOULD FALLBACK
+# ==========================================
+asdfghjkl
+What's the weather?
+Tell me a joke
+Who is the CEO?
+Random gibberish
+Can you book a meeting?

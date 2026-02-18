@@ -1,0 +1,49 @@
+=== Auto Sync Thu Feb 12 20:21:12 EST 2026 ===
+VPN already connected
+[dotenv@17.3.1] injecting env (6) from .env -- tip: ⚙️  override existing env vars with { override: true }
+=== Redash → Neon Sync ===
+Time: 2026-02-13T01:21:13.482Z
+
+Fetching Redash query 3349...
+Fetching Redash query 3351...
+  → 205 rows
+  → 131397 rows
+
+Syncing 205 companies...
+  → 205 upserted, 0 errors
+
+Syncing 131397 employees...
+  → Progress: 10000/131397 (7329 ok, 0 errors)
+  → Progress: 15000/131397 (12329 ok, 0 errors)
+  → Progress: 20000/131397 (17329 ok, 0 errors)
+  → Progress: 25000/131397 (22174 ok, 0 errors)
+  → Progress: 30000/131397 (27025 ok, 0 errors)
+  → Progress: 50000/131397 (32393 ok, 0 errors)
+  → Progress: 55000/131397 (37393 ok, 0 errors)
+  → Progress: 60000/131397 (42129 ok, 0 errors)
+  → Progress: 65000/131397 (46341 ok, 0 errors)
+  → Progress: 75000/131397 (52958 ok, 0 errors)
+  → Progress: 80000/131397 (57519 ok, 0 errors)
+  → Progress: 85000/131397 (62402 ok, 0 errors)
+  → Progress: 90000/131397 (65300 ok, 0 errors)
+  → Progress: 105000/131397 (71999 ok, 0 errors)
+  → Progress: 110000/131397 (75648 ok, 0 errors)
+  Error [Jake Neblett @ Summit BHC]: Error connecting to database: TypeError: fetch failed
+  Error [Jessica Montalvo @ Summit BHC]: Error connecting to database: TypeError: fetch failed
+  Error [Katherine Ramsey @ Summit BHC]: Error connecting to database: TypeError: fetch failed
+  Error [Lisa Duncan @ Summit BHC]: Error connecting to database: TypeError: fetch failed
+  Error [Marylou Morales @ Summit BHC]: Error connecting to database: TypeError: fetch failed
+  → Progress: 115000/131397 (80643 ok, 5 errors)
+  → Progress: 120000/131397 (85589 ok, 5 errors)
+  → Progress: 125000/131397 (90589 ok, 5 errors)
+  → Progress: 130000/131397 (94017 ok, 5 errors)
+  → Progress: 131397/131397 (95414 ok, 5 errors)
+  → 95414 upserted, 5 errors
+
+=== Sync Complete ===
+Companies: 205 ok, 0 errors
+Employees: 95414 ok, 5 errors
+Neon totals: 205 companies, 95419 employees
+Sync completed successfully
+=== Done Thu Feb 12 22:08:06 EST 2026 ===
+

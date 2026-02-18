@@ -10,6 +10,36 @@
     {
       "source": "/api/(.*)",
       "headers": [
+        { "key": "Cache-Control", "value": "s-maxage=86400, stale-while-revalidate=43200" }
+      ]
+    },
+    {
+      "source": "/api/auth",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/api/sync-status",
+      "headers": [
+        { "key": "Cache-Control", "value": "s-maxage=10, stale-while-revalidate=5" }
+      ]
+    },
+    {
+      "source": "/api/sync-latest",
+      "headers": [
+        { "key": "Cache-Control", "value": "s-maxage=60, stale-while-revalidate=30" }
+      ]
+    },
+    {
+      "source": "/api/vercel-status",
+      "headers": [
+        { "key": "Cache-Control", "value": "s-maxage=60, stale-while-revalidate=30" }
+      ]
+    },
+    {
+      "source": "/api/neon-status",
+      "headers": [
         { "key": "Cache-Control", "value": "s-maxage=300, stale-while-revalidate=60" }
       ]
     },

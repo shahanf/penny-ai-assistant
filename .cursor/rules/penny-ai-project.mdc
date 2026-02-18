@@ -1,0 +1,30 @@
+---
+description: Penny AI Assistant project context and conventions
+alwaysApply: true
+---
+
+# Penny AI Assistant – Project Context
+
+## What this project is
+
+- **Penny** is an AI assistant for an EWA (Earned Wage Access) admin portal. She answers natural-language questions about employees, adoption, transfers, savings, outstanding balances, and reports.
+- **Stack**: React 18, Vite 7, React Router 7, Tailwind CSS. Data from CSV files (no database).
+- **Modes**: Default is pattern-based (`src/utils/pennyQueryProcessor.js`). Optional Claude API via `src/services/pennyAIService.js` when `VITE_PENNY_AI_MODE=claude`.
+
+## Key files to edit
+
+- **Query behavior (pattern mode)**: `src/utils/pennyQueryProcessor.js` — synonyms, intent matching, response builders.
+- **AI / system prompt (Claude mode)**: `src/services/pennyAIService.js` — `buildSystemPrompt()`, `processQueryWithAI()`.
+- **Data layer**: `src/services/pennyDataService.js`, `src/services/csvDataLoader.js`. Data lives in `data/` and `public/data/` (Client Summary, Employee Summary, etc.).
+- **Penny personality and examples**: `penny-ai-studio/SYSTEM_PROMPT.txt`, `penny-ai-studio/SAMPLE_CONVERSATIONS.jsonl`, `penny-ai-studio/README.md`.
+- **UI**: `src/App.jsx` (main Penny chat), `src/components/penny/*`, `src/constants/pennyExampleQuestions.js`.
+
+## Response contract
+
+Penny responses are objects: `text` (markdown), `type`, optional `richContent` (e.g. table, data-card, `expandList` for side panel), `actions`, `suggestions`, `followUp`. Keep this shape when adding handlers or changing the API integration.
+
+## Conventions
+
+- Use existing `pennyDataService` methods for any new data needs; extend `csvDataLoader` if new CSVs are added.
+- New query intents: add patterns and handlers in `pennyQueryProcessor.js` and mirror behavior in the system prompt in `pennyAIService.js` when using Claude.
+- JSX: functional components; Tailwind for styling. Penny-specific components live under `src/components/penny/` and `PennyAvatar.jsx`.

@@ -1,0 +1,5 @@
+/bin/bash: /Users/shahan/Documents/RELAUNCH/penny-ai-assistant/scripts/auto-sync.sh: Operation not permitted
+/bin/bash: line 7: /Users/shahan/Documents/RELAUNCH/penny-ai-assistant/scripts/sync.log: Operation not permitted
+/bin/bash: line 16: /Users/shahan/Documents/RELAUNCH/penny-ai-assistant/scripts/sync.log: Operation not permitted
+/bin/bash: line 19: /Users/shahan/Documents/RELAUNCH/penny-ai-assistant/scripts/sync.log: Operation not permitted
+/bin/bash: line 20: /Users/shahan/Documents/RELAUNCH/penny-ai-assistant/scripts/sync.log: Operation not permitted
