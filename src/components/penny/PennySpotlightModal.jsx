@@ -73,6 +73,7 @@ function PennySpotlightModal({ isOpen, onClose }) {
   const [employeeNames, setEmployeeNames] = useState([])
   const inputRef = useRef(null)
   const messagesEndRef = useRef(null)
+  const lastUserMessageRef = useRef(null)
   const listOpenCursorTimeoutRef = useRef(null)
 
   // Rotate "More questions" every 20 seconds (show 6 at a time)
@@ -138,9 +139,15 @@ function PennySpotlightModal({ isOpen, onClose }) {
     }
   }, [isOpen])
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll: scroll to the user's last message so their question stays visible at top
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (isTyping) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    } else if (lastUserMessageRef.current) {
+      requestAnimationFrame(() => {
+        lastUserMessageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
+    }
   }, [messages, isTyping])
 
   // Thinking Penny cursor while processing
@@ -397,10 +404,10 @@ function PennySpotlightModal({ isOpen, onClose }) {
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-      {/* Backdrop with blur */}
-      <div 
+      {/* Backdrop with blur — close list first if open, otherwise close modal */}
+      <div
         className="absolute inset-0 bg-slate-900/40 backdrop-blur-md transition-opacity duration-300"
-        onClick={handleClose}
+        onClick={expandedList ? () => setExpandedList(null) : handleClose}
       />
       
       {/* Confetti layer */}
@@ -425,11 +432,13 @@ function PennySpotlightModal({ isOpen, onClose }) {
           <div className="absolute -inset-4 bg-gradient-to-r from-purple-500/20 via-fuchsia-500/20 to-purple-500/20 
                           rounded-3xl blur-2xl animate-pulse-slow" />
           
-          {/* Modal content */}
-          <div className={`relative bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl 
-                          border border-purple-200/50 overflow-hidden flex flex-col max-h-[80vh] ${expandedList ? 'rounded-r-none' : ''}`}>
+          {/* Modal content — frosted glass */}
+          <div className={`relative bg-white/70 backdrop-blur-2xl rounded-2xl shadow-2xl
+                          border border-white/50 overflow-hidden flex flex-col max-h-[80vh] ${expandedList ? 'rounded-r-none' : ''}`}>
+          {/* Top shine */}
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/70 to-transparent pointer-events-none" />
           {/* Inner glow */}
-          <div className="absolute inset-0 bg-gradient-to-b from-purple-50/50 to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-b from-white/30 to-transparent pointer-events-none" />
           
           {/* Header with Penny */}
           <div className="relative px-6 pt-6 pb-4 flex-shrink-0">
@@ -599,7 +608,7 @@ function PennySpotlightModal({ isOpen, onClose }) {
                 </div>
               </div>
               <h2 className="text-2xl font-semibold text-slate-800">Ask Penny</h2>
-              <p className="text-sm text-slate-500">Your AI-powered assistant</p>
+              <p className="text-sm text-slate-500">CS and Delivery Assistant</p>
             </div>
           </div>
 
@@ -630,21 +639,25 @@ function PennySpotlightModal({ isOpen, onClose }) {
                 </div>
               ) : (
                 <div className="py-2 space-y-3">
-                  {messages.map((message) => (
-                    <PennyMessage
-                      key={message.id}
-                      message={message}
-                      onAction={handleAction}
-                      onExpandList={(list) => {
-                        document.body.classList.add('penny-thinking-cursor')
-                        setExpandedList(list)
-                      }}
-                      companyNames={companyNames}
-                      employeeNames={employeeNames}
-                      onEmployeeClick={(name) => handlePromptClick('Tell me about ' + name)}
-                      onCompanyClick={(name) => handlePromptClick('Show company stats for ' + name)}
-                    />
-                  ))}
+                  {messages.map((message, idx) => {
+                    const isLastUser = message.type === 'user' && !messages.slice(idx + 1).some(m => m.type === 'user')
+                    return (
+                      <div key={message.id} ref={isLastUser ? lastUserMessageRef : undefined}>
+                        <PennyMessage
+                          message={message}
+                          onAction={handleAction}
+                          onExpandList={(list) => {
+                            document.body.classList.add('penny-thinking-cursor')
+                            setExpandedList(list)
+                          }}
+                          companyNames={companyNames}
+                          employeeNames={employeeNames}
+                          onEmployeeClick={(name) => handlePromptClick('Tell me about ' + name)}
+                          onCompanyClick={(name) => handlePromptClick('Show company stats for ' + name)}
+                        />
+                      </div>
+                    )
+                  })}
                   {isTyping && <PennyTypingIndicator />}
                   <div ref={messagesEndRef} />
                 </div>
@@ -661,8 +674,8 @@ function PennySpotlightModal({ isOpen, onClose }) {
                 <div className="absolute -inset-1 bg-gradient-to-r from-purple-400 via-fuchsia-400 to-purple-400 
                                 rounded-xl opacity-0 group-focus-within:opacity-50 blur-md transition-opacity duration-300" />
                 
-                <div className="relative flex items-center bg-white rounded-xl border-2 border-slate-200 
-                                group-focus-within:border-purple-400 shadow-sm group-focus-within:shadow-lg 
+                <div className="relative flex items-center bg-white/60 backdrop-blur-lg rounded-2xl border border-white/70
+                                group-focus-within:border-purple-300/80 shadow-sm group-focus-within:shadow-purple-300/25
                                 transition-all duration-300">
                   <input
                     ref={inputRef}
@@ -670,22 +683,23 @@ function PennySpotlightModal({ isOpen, onClose }) {
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder={hasMessages ? "Ask a follow-up question..." : "Ask me anything about your employees, transfers, savings..."}
-                    className="flex-1 px-4 py-2.5 text-sm bg-transparent outline-none text-slate-800 
+                    className="flex-1 px-5 py-3 text-base sm:text-sm bg-transparent outline-none text-slate-800
                                placeholder:text-slate-400"
                     disabled={isTyping}
                   />
                   <button
                     type="submit"
                     disabled={!query.trim() || isTyping}
-                    className="mr-2 p-2 bg-gradient-to-r from-purple-500 to-fuchsia-500 
-                               hover:from-purple-600 hover:to-fuchsia-600 
+                    className="mr-2 p-2.5 bg-gradient-to-r from-purple-500 to-fuchsia-500
+                               hover:from-purple-400 hover:to-fuchsia-400
                                disabled:from-slate-300 disabled:to-slate-300
-                               text-white rounded-lg transition-all duration-200
-                               disabled:cursor-not-allowed"
+                               text-white rounded-xl transition-all duration-200
+                               disabled:cursor-not-allowed shadow-md shadow-purple-500/20
+                               hover:shadow-lg hover:shadow-purple-500/30"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                            d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
+                            d="M6 12h12m0 0l-5-5m5 5l-5 5" />
                     </svg>
                   </button>
                 </div>
@@ -698,24 +712,25 @@ function PennySpotlightModal({ isOpen, onClose }) {
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
                   {hasMessages ? 'More questions' : 'Try asking'}
                 </p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {getRotatingExampleQuestions(promptRotationIndex, randomExampleEmployeeName, randomExampleCompanyName, randomExamplePartnershipName).map((prompt, idx) => (
+                <div className="grid grid-cols-2 gap-2">
+                  {getRotatingExampleQuestions(promptRotationIndex, randomExampleEmployeeName ? [randomExampleEmployeeName] : [], randomExampleCompanyName ? [randomExampleCompanyName] : [], randomExamplePartnershipName ? [randomExamplePartnershipName] : []).map((prompt, idx) => (
                     <button
                       key={`${promptRotationIndex}-${idx}-${prompt.text}`}
                       onClick={() => handlePromptClick(prompt.text)}
                       disabled={isTyping}
                       className="
-                        flex items-start gap-1.5 px-2 py-1.5
-                        bg-gray-50 hover:bg-purple-50
-                        border border-gray-200 hover:border-purple-200
-                        rounded-md text-gray-700 hover:text-purple-700
-                        transition-colors duration-150
+                        flex items-start gap-1.5 px-2.5 py-2
+                        bg-white/40 hover:bg-white/60
+                        border border-white/50 hover:border-purple-200/60
+                        backdrop-blur-sm
+                        rounded-lg text-gray-700 hover:text-purple-700
+                        transition-all duration-200
                         text-left
                         disabled:opacity-50 disabled:cursor-not-allowed
                       "
                     >
-                      <span className="text-sm flex-shrink-0">{prompt.icon}</span>
-                      <span className="line-clamp-2 text-xs leading-tight">{prompt.displayText ?? prompt.text}</span>
+                      <span className="text-sm flex-shrink-0 mt-0.5">{prompt.icon}</span>
+                      <span className="line-clamp-2 text-xs leading-relaxed">{prompt.displayText ?? prompt.text}</span>
                     </button>
                   ))}
                 </div>
@@ -732,7 +747,7 @@ function PennySpotlightModal({ isOpen, onClose }) {
         </div>
 
         {expandedList && (
-          <div className="w-[64rem] min-w-[56rem] max-w-[90vw] max-h-[80vh] flex-shrink-0 rounded-r-2xl overflow-hidden border border-l-0 border-purple-200/50 shadow-2xl bg-white">
+          <div className="w-[64rem] min-w-[56rem] max-w-[90vw] max-h-[80vh] flex-shrink-0 rounded-r-2xl overflow-hidden border border-l-0 border-white/50 shadow-2xl bg-white/70 backdrop-blur-2xl">
             <PennyListExpandedPanel
               richContent={expandedList}
               title={expandedList?.title ?? 'Full list'}

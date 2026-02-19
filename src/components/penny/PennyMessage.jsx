@@ -258,6 +258,7 @@ function PennyMessage({ message, onAction, onExpandList, companyNames = [], empl
         const outstandingBalanceExpandList = d.outstandingBalanceExpandList || null
         const activeUsersExpandList = d.activeUsersExpandList || null
         const partnershipExpandList = d.partnershipExpandList || null
+        const revenueExpandList = d.revenueExpandList || null
         const adoptedExpandList = d.adoptedExpandList || null
         const eligibleExpandList = d.eligibleExpandList || null
         const transfersExpandList = d.transfersExpandList || null
@@ -323,7 +324,6 @@ function PennyMessage({ message, onAction, onExpandList, companyNames = [], empl
         const nextdayAmountInPeriod = d.nextday_amount_in_period != null ? Number(d.nextday_amount_in_period) : null
         const instantTransfersInPeriod = d.instant_transfers_in_period != null ? Number(d.instant_transfers_in_period) : null
         const nextdayTransfersInPeriod = d.nextday_transfers_in_period != null ? Number(d.nextday_transfers_in_period) : null
-        const netFeeRevLastDay = d.net_fee_rev_on_last_day != null ? Number(d.net_fee_rev_on_last_day) : null
         const hasAdminConfig = hasConfig || [sector, pricingModel].some(v => v != null) || inHypercare || shiftsCreated != null
 
         const progressPct = eligible > 0 ? Math.min(100, (adopted / eligible) * 100) : 0
@@ -381,7 +381,6 @@ function PennyMessage({ message, onAction, onExpandList, companyNames = [], empl
           backLines.push('', '--- Revenue ---')
           if (sum30dNetRev != null) backLines.push(`Net Rev (30d): $${sum30dNetRev.toFixed(2)}`)
           if (sum14dNetRev != null) backLines.push(`Net Rev (14d): $${sum14dNetRev.toFixed(2)}`)
-          if (netFeeRevLastDay != null) backLines.push(`Daily Net Fee: $${netFeeRevLastDay.toFixed(2)}`)
           if (trailing30dGrossRev != null) backLines.push(`Avg Daily Gross Rev (30d): $${trailing30dGrossRev.toFixed(2)}`)
         }
         // App Usage
@@ -468,7 +467,7 @@ function PennyMessage({ message, onAction, onExpandList, companyNames = [], empl
                 <div className="px-3 pt-3 pb-1">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <h3 className="text-[15px] font-bold text-gray-900 truncate leading-snug">{renderClickable(company)}</h3>
+                      <h3 className="text-lg font-extrabold text-gray-900 truncate leading-snug">{renderClickable(company)}</h3>
                       {creditScore && (
                         creditScoreExpandList && onExpandList ? (
                           <button type="button" onClick={(e) => { e.stopPropagation(); onExpandList(creditScoreExpandList) }}
@@ -508,6 +507,18 @@ function PennyMessage({ message, onAction, onExpandList, companyNames = [], empl
                       {launchDate && <span className="text-[10px] text-gray-400">{launchDate}</span>}
                     </div>
                   )}
+                  {/* Hourly-Salary Breakdown link */}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onAction?.({ type: 'suggestion', text: `How many hourly employees at ${company}` }) }}
+                    className="inline-flex items-center gap-1 mt-1 text-[10px] font-medium text-purple-500 hover:text-purple-700 hover:underline transition-colors"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+                    </svg>
+                    Hourly–Salary Breakdown
+                  </button>
                 </div>
 
                 {/* BODY: 2-column grid */}
@@ -646,10 +657,21 @@ function PennyMessage({ message, onAction, onExpandList, companyNames = [], empl
                       ))}
                       {/* Divider between usage and revenue */}
                       {hasAppUsage && hasRevenue && <span className="text-gray-300 text-[10px]">|</span>}
-                      {/* Revenue metrics */}
-                      {sum30dNetRev != null && <div className="flex items-center gap-1"><span className="text-[10px] text-gray-400">Net Rev (30d)</span><span className="text-[12px] font-bold text-gray-800 tabular-nums">{fmtCur(sum30dNetRev)}</span></div>}
-                      {sum14dNetRev != null && <div className="flex items-center gap-1"><span className="text-[10px] text-gray-400">Net Rev (14d)</span><span className="text-[12px] font-bold text-gray-800 tabular-nums">{fmtCur(sum14dNetRev)}</span></div>}
-                      {netFeeRevLastDay != null && netFeeRevLastDay !== 0 && <div className="flex items-center gap-1"><span className="text-[10px] text-gray-400">Daily Net Fee</span><span className="text-[12px] font-bold text-gray-800 tabular-nums">{fmtCur(netFeeRevLastDay)}</span></div>}
+                      {/* Revenue metrics — clickable to show partnership revenue comparison */}
+                      {sum30dNetRev != null && (revenueExpandList && onExpandList ? (
+                        <button type="button" onClick={(e) => { e.stopPropagation(); onExpandList(revenueExpandList) }} className="flex items-center gap-1 hover:opacity-70 transition-opacity">
+                          <span className="text-[10px] text-gray-400">Net Rev (30d)</span><span className="text-[12px] font-bold text-gray-800 tabular-nums">{fmtCur(sum30dNetRev)}</span>
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-1"><span className="text-[10px] text-gray-400">Net Rev (30d)</span><span className="text-[12px] font-bold text-gray-800 tabular-nums">{fmtCur(sum30dNetRev)}</span></div>
+                      ))}
+                      {sum14dNetRev != null && (revenueExpandList && onExpandList ? (
+                        <button type="button" onClick={(e) => { e.stopPropagation(); onExpandList(revenueExpandList) }} className="flex items-center gap-1 hover:opacity-70 transition-opacity">
+                          <span className="text-[10px] text-gray-400">Net Rev (14d)</span><span className="text-[12px] font-bold text-gray-800 tabular-nums">{fmtCur(sum14dNetRev)}</span>
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-1"><span className="text-[10px] text-gray-400">Net Rev (14d)</span><span className="text-[12px] font-bold text-gray-800 tabular-nums">{fmtCur(sum14dNetRev)}</span></div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -1089,7 +1111,7 @@ function PennyMessage({ message, onAction, onExpandList, companyNames = [], empl
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); displayName && handleEmployeeClick(displayName) }}
-                          className="text-base font-bold text-purple-600 hover:text-purple-800 truncate leading-snug block"
+                          className="text-lg font-extrabold text-purple-600 hover:text-purple-800 truncate leading-snug block"
                         >{displayName}</button>
                         {empSubline && onCompanyClick ? (
                           <button

@@ -53,7 +53,7 @@ export default function PasswordGate({ onAuthenticated }) {
   }
 
   return (
-    <div className="min-h-[100dvh] w-full bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800 flex items-center justify-center p-4"
+    <div className="min-h-[100dvh] w-full bg-gradient-to-br from-purple-500 via-purple-600 to-indigo-700 flex items-center justify-center p-4 relative penny-noise"
          style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', paddingTop: 'env(safe-area-inset-top, 0px)' }}>
       {/* Confetti-style ambient particles */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
@@ -79,9 +79,11 @@ export default function PasswordGate({ onAuthenticated }) {
       <div className="absolute -inset-4 bg-gradient-to-r from-purple-400/30 via-fuchsia-400/30 to-purple-400/30 rounded-3xl blur-2xl animate-pulse-slow" />
 
       {/* Card */}
-      <div className={`relative bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-purple-200/50 overflow-hidden w-full max-w-sm ${shake ? 'animate-shake' : ''}`}>
+      <div className={`relative bg-white/70 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/50 overflow-hidden w-full max-w-sm ${shake ? 'animate-shake' : ''}`}>
+        {/* Top shine */}
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/70 to-transparent pointer-events-none" />
         {/* Inner glow */}
-        <div className="absolute inset-0 bg-gradient-to-b from-purple-50/50 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-white/30 to-transparent pointer-events-none" />
 
         <div className="relative px-8 py-10 flex flex-col items-center">
           {/* Penny avatar */}
@@ -100,7 +102,7 @@ export default function PasswordGate({ onAuthenticated }) {
               {/* Input glow on focus */}
               <div className="absolute -inset-1 bg-gradient-to-r from-purple-400 via-fuchsia-400 to-purple-400 rounded-xl opacity-0 group-focus-within:opacity-50 blur-md transition-opacity duration-300" />
 
-              <div className="relative flex items-center bg-white rounded-xl border-2 border-slate-200 group-focus-within:border-purple-400 shadow-sm group-focus-within:shadow-lg transition-all duration-300">
+              <div className="relative flex items-center bg-white/60 backdrop-blur-lg rounded-2xl border border-white/70 group-focus-within:border-purple-300/80 shadow-sm group-focus-within:shadow-purple-300/25 transition-all duration-300">
                 {/* Lock icon */}
                 <div className="pl-4 text-slate-400">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -115,6 +117,7 @@ export default function PasswordGate({ onAuthenticated }) {
                   onChange={(e) => { setPassword(e.target.value); setError(''); }}
                   placeholder="Password"
                   className="flex-1 px-3 py-3 text-base sm:text-sm bg-transparent outline-none text-slate-800 placeholder:text-slate-400"
+
                   disabled={isChecking}
                   autoComplete="current-password"
                 />
@@ -122,7 +125,7 @@ export default function PasswordGate({ onAuthenticated }) {
                 <button
                   type="submit"
                   disabled={!password.trim() || isChecking}
-                  className="mr-2 p-2 bg-gradient-to-r from-purple-500 to-fuchsia-500 hover:from-purple-600 hover:to-fuchsia-600 disabled:from-slate-300 disabled:to-slate-300 text-white rounded-lg transition-all duration-200 disabled:cursor-not-allowed"
+                  className="mr-2 p-2.5 bg-gradient-to-r from-purple-500 to-fuchsia-500 hover:from-purple-400 hover:to-fuchsia-400 disabled:from-slate-300 disabled:to-slate-300 text-white rounded-xl transition-all duration-200 disabled:cursor-not-allowed shadow-md shadow-purple-500/20 hover:shadow-lg hover:shadow-purple-500/30"
                 >
                   {isChecking ? (
                     <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">

@@ -132,7 +132,7 @@ function SkeletonCard() {
   )
 }
 
-export default function SyncStatusDashboard() {
+export default function SyncStatusDashboard({ onClose } = {}) {
   const [syncs, setSyncs] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -258,7 +258,7 @@ export default function SyncStatusDashboard() {
               )}
             </button>
             <button
-              onClick={() => navigate('/')}
+              onClick={onClose || (() => navigate('/'))}
               className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm rounded-lg transition-colors border border-white/20"
             >
               Back to Penny

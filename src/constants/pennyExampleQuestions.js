@@ -101,6 +101,8 @@ export const PENNY_EXAMPLE_QUESTIONS = [
   { text: 'Top companies by shifts', icon: '📅' },
 
   // ── Partnership Queries ──
+  { text: `List all live ${RANDOM_PARTNERSHIP_PLACEHOLDER} clients`, icon: '🤝' },
+  { text: `List all live ${RANDOM_PARTNERSHIP_PLACEHOLDER} companies`, icon: '🤝' },
   { text: `How many ${RANDOM_PARTNERSHIP_PLACEHOLDER} companies are live?`, icon: '🤝' },
   { text: `${RANDOM_PARTNERSHIP_PLACEHOLDER} companies`, icon: '🤝' },
   { text: `Top ${RANDOM_PARTNERSHIP_PLACEHOLDER} companies by adoption`, icon: '📈' },
@@ -172,7 +174,7 @@ export const PENNY_EXAMPLE_QUESTIONS = [
 ]
 
 export const PENNY_EXAMPLE_ROTATE_MS = 4 * 1000
-export const PENNY_EXAMPLE_SHOW_COUNT = 8
+export const PENNY_EXAMPLE_SHOW_COUNT = 4
 
 /** Fallback when Enrolled Employees aren't loaded yet */
 const FALLBACK_EMPLOYEE_DISPLAY = 'an employee'

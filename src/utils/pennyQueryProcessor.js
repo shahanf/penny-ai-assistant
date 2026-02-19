@@ -12,25 +12,256 @@
 import pennyDataService from '../services/pennyDataService'
 
 /**
- * Enrich a company stats/summary object with pausedCount from employee data.
- * Used by all company-stats-card paths to ensure the Paused pill always shows.
+ * Enrich a company stats/summary object with ALL expand lists for the company card.
+ * This ensures every company-stats-card path has clickable pending pills, savings rows,
+ * outstanding balances, active users, transfers, CSM/DM lists, etc.
  */
-async function enrichWithPausedCount(statsObj) {
+async function enrichCompanyCard(statsObj) {
   if (!statsObj?.company) return { pausedCount: 0 }
-  const empStats = await pennyDataService.getCompanyEmployeeStats(statsObj.company)
-  const pausedEmployees = (empStats?.employees || []).filter(e => e.paused === true)
-  const pausedExpandList = pausedEmployees.length > 0 ? {
+  const companyName = statsObj.company
+  const empStats = await pennyDataService.getCompanyEmployeeStats(companyName)
+  const allEmployees = empStats?.employees || []
+  const result = {}
+
+  // Admins
+  result.admins = await pennyDataService.getAdminsByCompany(companyName)
+
+  // Outstanding balance
+  const employeesWithBalance = allEmployees.filter(e => (e.outstanding_balance || 0) > 0)
+  result.outstandingBalanceTotal = empStats ? empStats.totalOutstandingBalance : 0
+  result.outstandingBalanceExpandList = {
     type: 'table',
-    title: `Paused employees at ${statsObj.company}`,
+    title: `Outstanding at ${companyName}`,
     data: {
-      headers: ['Name', 'Company', 'Pause Reason', 'Status'],
-      rows: pausedEmployees.map(e => [e.full_name || '—', e.company || '—', e.pause_reason || '—', 'Paused']),
-      employeeNames: pausedEmployees.map(e => e.full_name),
-      rawEmployees: pausedEmployees,
+      headers: ['Name', 'Outstanding Balance', 'Company'],
+      rows: employeesWithBalance.sort((a, b) => (b.outstanding_balance || 0) - (a.outstanding_balance || 0)).map(e => [e.full_name, `$${(e.outstanding_balance || 0).toFixed(2)}`, e.company || '—']),
+      employeeNames: employeesWithBalance.map(e => e.full_name),
+      rawEmployees: employeesWithBalance,
     },
-  } : null
-  return { pausedCount: pausedEmployees.length, ...(pausedExpandList && { pausedExpandList }) }
+    amountColumnIndex: 1,
+    totalLabel: 'Total outstanding',
+  }
+
+  // Active users
+  const activeEmployees = allEmployees.filter(e => !e.paused)
+  result.activeUsersExpandList = {
+    type: 'table',
+    title: `Active Users at ${companyName}`,
+    data: {
+      headers: ['Name', 'Status', 'Transfers (90d)', 'Volume (90d)', 'Company'],
+      rows: activeEmployees.map(e => [e.full_name, e.current_state || 'Active', (e.transfers_90d || 0).toLocaleString(), `$${(e.volume_90d_usd || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, e.company || '—']),
+      employeeNames: activeEmployees.map(e => e.full_name),
+      rawEmployees: activeEmployees,
+    },
+  }
+
+  // Adopted / Eligible
+  if (allEmployees.length > 0) {
+    result.adoptedExpandList = {
+      type: 'table',
+      title: `Adopted at ${companyName}`,
+      data: {
+        headers: ['Name', 'Status', 'Transfers (90d)', 'Company'],
+        rows: allEmployees.map(e => [e.full_name, e.current_state || '—', (e.transfers_90d || 0).toLocaleString(), e.company || '—']),
+        employeeNames: allEmployees.map(e => e.full_name),
+        rawEmployees: allEmployees,
+      },
+    }
+    result.eligibleExpandList = {
+      type: 'table',
+      title: `Employees at ${companyName}`,
+      data: {
+        headers: ['Name', 'Status', 'Pay Type', 'Company'],
+        rows: allEmployees.map(e => [e.full_name, e.current_state || '—', e.salary_or_hourly || '—', e.company || '—']),
+        employeeNames: allEmployees.map(e => e.full_name),
+        rawEmployees: allEmployees,
+      },
+    }
+  }
+
+  // Transfers
+  const transferEmployees = allEmployees.filter(e => (e.transfers_90d || 0) > 0 || (e.lifetime_total_transfers || 0) > 0).sort((a, b) => (b.transfers_90d || 0) - (a.transfers_90d || 0))
+  if (transferEmployees.length > 0) {
+    result.transfersExpandList = {
+      type: 'table',
+      title: `Employees with transfers at ${companyName}`,
+      data: {
+        headers: ['Employee', 'Transfers (90d)', 'Volume (90d)', 'Company'],
+        rows: transferEmployees.map(e => [e.full_name || '—', (e.transfers_90d || 0).toLocaleString(), `$${(e.volume_90d_usd || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, e.company || '—']),
+        employeeNames: transferEmployees.map(e => e.full_name),
+        rawEmployees: transferEmployees,
+      },
+      amountColumnIndex: 2,
+      totalLabel: 'Total volume (90d)',
+    }
+  }
+
+  // Savings
+  const savingsEmployees = allEmployees.filter(e => e.has_savings_acct || (e.save_balance || 0) > 0).sort((a, b) => (b.save_balance || 0) - (a.save_balance || 0))
+  if (savingsEmployees.length > 0) {
+    result.savingsExpandList = {
+      type: 'table',
+      title: `Savings accounts at ${companyName}`,
+      data: {
+        headers: ['Employee', 'Save Balance', 'Company'],
+        rows: savingsEmployees.map(e => [e.full_name || '—', `$${(e.save_balance || 0).toFixed(2)}`, e.company || '—']),
+        employeeNames: savingsEmployees.map(e => e.full_name),
+        rawEmployees: savingsEmployees,
+      },
+      amountColumnIndex: 1,
+      totalLabel: 'Total saved',
+    }
+  } else if (statsObj.active_savings_accounts > 0 && allEmployees.length > 0) {
+    result.savingsExpandList = {
+      type: 'table',
+      title: `Employees at ${companyName} (${statsObj.active_savings_accounts} savings accounts per aggregate data)`,
+      data: {
+        headers: ['Employee', 'Save Balance', 'Company'],
+        rows: allEmployees.map(e => [e.full_name || '—', `$${(e.save_balance || 0).toFixed(2)}`, e.company || '—']),
+        employeeNames: allEmployees.map(e => e.full_name),
+        rawEmployees: allEmployees,
+      },
+      amountColumnIndex: 1,
+      totalLabel: 'Total saved',
+    }
+  }
+
+  // Partnership expand list
+  const partnershipName = (statsObj.partnership != null && String(statsObj.partnership).trim()) ? String(statsObj.partnership).trim() : null
+  if (partnershipName) {
+    const companiesInPartnership = await pennyDataService.getCompaniesByPartnership(partnershipName)
+    if (companiesInPartnership.length > 0) {
+      result.partnershipExpandList = {
+        type: 'table',
+        title: `Companies in ${partnershipName}`,
+        data: {
+          headers: ['Company', 'Partnership'],
+          rows: companiesInPartnership.map(c => [c.company || '—', c.partnership || '—']),
+          rawCompanies: companiesInPartnership,
+        },
+      }
+      const fmtCurRev = (v) => v != null && Number.isFinite(Number(v)) ? `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
+      const revSorted = [...companiesInPartnership].sort((a, b) => (b.sum_trailing_30d_net_rev || 0) - (a.sum_trailing_30d_net_rev || 0))
+      result.revenueExpandList = {
+        type: 'table',
+        title: `Revenue — ${partnershipName} Companies`,
+        data: {
+          headers: ['Company', 'Adoption', 'Net Rev (30d)', 'Net Rev (14d)', 'Savings Balance'],
+          rows: revSorted.map(c => [
+            c.company || '—',
+            `${((c.adoption_rate ?? 0) * 100).toFixed(1)}%`,
+            fmtCurRev(c.sum_trailing_30d_net_rev),
+            fmtCurRev(c.sum_trailing_14d_net_rev),
+            fmtCurRev(c.savings_balance_usd),
+          ]),
+          rawCompanies: revSorted,
+        },
+        amountColumnIndex: 2,
+        totalLabel: 'Total Net Rev (30d)',
+      }
+    }
+  }
+
+  // CSM expand list
+  const csmName = (statsObj.csm_owner || '').trim()
+  if (csmName) {
+    const csmCompanies = await pennyDataService.getCompaniesByCsmOwner(csmName)
+    if (csmCompanies.length > 0) {
+      const _fmtLd = (d) => { if (!d) return '—'; const dt = new Date(d); return Number.isNaN(dt.getTime()) ? String(d) : dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) }
+      const _fmtRev = (v) => v != null && Number.isFinite(Number(v)) && Number(v) !== 0 ? `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
+      result.csmExpandList = { type: 'table', title: `Accounts managed by ${csmName} (CSM)`, data: { headers: ['Company', 'Partnership', 'Adoption', 'Net Rev (30d)', 'Launch Date'], rows: csmCompanies.map(c => [c.company || '—', c.partnership || '—', `${((c.adoption_rate ?? 0) * 100).toFixed(1)}%`, _fmtRev(c.sum_trailing_30d_net_rev), _fmtLd(c.launch_date)]), rawCompanies: csmCompanies } }
+    }
+  }
+
+  // DM expand list
+  const dmName = (statsObj.delivery_manager || '').trim()
+  if (dmName) {
+    const dmCompanies = await pennyDataService.getCompaniesByDeliveryManager(dmName)
+    if (dmCompanies.length > 0) {
+      const _fmtLd = (d) => { if (!d) return '—'; const dt = new Date(d); return Number.isNaN(dt.getTime()) ? String(d) : dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) }
+      const _fmtRev = (v) => v != null && Number.isFinite(Number(v)) && Number(v) !== 0 ? `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
+      result.dmExpandList = { type: 'table', title: `Accounts launched by ${dmName} (DM)`, data: { headers: ['Company', 'Partnership', 'Adoption', 'Net Rev (30d)', 'Launch Date'], rows: dmCompanies.map(c => [c.company || '—', c.partnership || '—', `${((c.adoption_rate ?? 0) * 100).toFixed(1)}%`, _fmtRev(c.sum_trailing_30d_net_rev), _fmtLd(c.launch_date)]), rawCompanies: dmCompanies } }
+    }
+  }
+
+  // Pending
+  const pendingEmployees = allEmployees.filter(e => (e.current_state || '').toLowerCase() === 'pending')
+  if (pendingEmployees.length > 0) {
+    result.pendingExpandList = {
+      type: 'table',
+      title: `Pending employees at ${companyName}`,
+      data: {
+        headers: ['Name', 'Status', 'Pay Type', 'Company'],
+        rows: pendingEmployees.map(e => [e.full_name || '—', 'Pending', e.salary_or_hourly || '—', e.company || '—']),
+        employeeNames: pendingEmployees.map(e => e.full_name),
+        rawEmployees: pendingEmployees,
+      },
+    }
+  } else if (statsObj.pending > 0 && allEmployees.length > 0) {
+    result.pendingExpandList = {
+      type: 'table',
+      title: `Employees at ${companyName} (${statsObj.pending} pending per aggregate data)`,
+      data: {
+        headers: ['Name', 'Status', 'Pay Type', 'Company'],
+        rows: allEmployees.map(e => [e.full_name || '—', e.current_state || '—', e.salary_or_hourly || '—', e.company || '—']),
+        employeeNames: allEmployees.map(e => e.full_name),
+        rawEmployees: allEmployees,
+      },
+    }
+  }
+
+  // Enrolling
+  const enrollingEmployees = allEmployees.filter(e => (e.current_state || '').toLowerCase() === 'enrolling')
+  if (enrollingEmployees.length > 0) {
+    result.enrollingExpandList = {
+      type: 'table',
+      title: `Enrolling employees at ${companyName}`,
+      data: {
+        headers: ['Name', 'Status', 'Pay Type', 'Company'],
+        rows: enrollingEmployees.map(e => [e.full_name || '—', 'Enrolling', e.salary_or_hourly || '—', e.company || '—']),
+        employeeNames: enrollingEmployees.map(e => e.full_name),
+        rawEmployees: enrollingEmployees,
+      },
+    }
+  }
+
+  // Paused
+  const pausedEmployees = allEmployees.filter(e => e.paused === true)
+  result.pausedCount = pausedEmployees.length
+  if (pausedEmployees.length > 0) {
+    result.pausedExpandList = {
+      type: 'table',
+      title: `Paused employees at ${companyName}`,
+      data: {
+        headers: ['Name', 'Company', 'Pause Reason', 'Status'],
+        rows: pausedEmployees.map(e => [e.full_name || '—', e.company || '—', e.pause_reason || '—', 'Paused']),
+        employeeNames: pausedEmployees.map(e => e.full_name),
+        rawEmployees: pausedEmployees,
+      },
+    }
+  }
+
+  // Credit score expand list
+  if (statsObj.credit_score) {
+    const csCompanies = await pennyDataService.getCompaniesWithCreditScores()
+    if (csCompanies.length > 0) {
+      result.creditScoreExpandList = {
+        type: 'table',
+        title: 'All companies with credit scores',
+        data: {
+          headers: ['Company', 'Credit Score', 'Partnership', 'Adoption'],
+          rows: csCompanies.map(c => [c.company || '—', String(c.credit_score), c.partnership || '—', `${((c.adoption_rate ?? 0) * 100).toFixed(1)}%`]),
+          rawCompanies: csCompanies,
+        },
+      }
+    }
+  }
+
+  return result
 }
+
+// Backwards-compatible alias
+const enrichWithPausedCount = enrichCompanyCard
 
 // Extract bold-wrapped names from response text so PennyMessage can make them clickable
 // without needing a global lookup against 131K+ employees
@@ -393,8 +624,9 @@ function cleanEmployeeNameFromQuery(rawName) {
   const atMatch = name.match(/^(.+?)\s+(?:at|in|from)\s+.+$/i)
   if (atMatch && atMatch[1]) {
     const before = atMatch[1].trim()
-    // Only use it if the part before looks like a name (one or a few words)
-    if (before.length > 0 && before.length < 50 && !/^(the|all|everyone|show|list|get)$/i.test(before)) {
+    // Only use it if the part before looks like a name (one or a few words), not a generic/aggregate term
+    const genericWords = /^(the|all|everyone|show|list|get|users?|employees?|staff|people|active|enrolled|paused|how|many|total)$/i
+    if (before.length > 0 && before.length < 50 && !genericWords.test(before)) {
       name = before
     }
   }
@@ -1038,6 +1270,44 @@ async function handleCompanyQuery(query) {
     }
   }
 
+  // 0b-pre. "list all live [X] clients/companies" e.g. "list all live Harri Pay clients"
+  const listAllLiveMatch = lowerQuery.match(/list\s+(?:all\s+)?live\s+(.+?)\s+(?:companies?|clients?)\s*\.?$/i)
+  if (listAllLiveMatch) {
+    const partnershipName = listAllLiveMatch[1].trim()
+    if (partnershipName.length >= 2) {
+      const companies = await pennyDataService.getCompaniesByPartnership(partnershipName)
+      if (companies.length > 0) {
+        const displayName = companies[0].partnership || partnershipName
+        const sorted = [...companies].sort((a, b) => (b.adoption_rate ?? 0) - (a.adoption_rate ?? 0))
+        const list = sorted.slice(0, 15).map((c, i) =>
+          `${i + 1}. **${c.company}** — ${((c.adoption_rate ?? 0) * 100).toFixed(1)}% adoption`
+        ).join('\n')
+        const expandList = {
+          type: 'table',
+          title: `Live ${displayName} companies`,
+          data: {
+            headers: ['Company', 'Partnership', 'Adoption', 'Active', 'Sector'],
+            rows: sorted.map(c => [c.company || '—', c.partnership || '—', `${((c.adoption_rate ?? 0) * 100).toFixed(1)}%`, (c.active ?? 0).toLocaleString(), c.sector || '—']),
+          },
+        }
+        return {
+          text: `**${sorted.length} live ${displayName} companies:**\n\n${list}${sorted.length > 15 ? `\n\n_...and ${sorted.length - 15} more_` : ''}`,
+          richContent: {
+            type: 'data-card',
+            data: {
+              value: sorted.length.toString(),
+              label: `Live ${displayName} companies`,
+              detail: `${sorted.length} companies`,
+            },
+            expandList,
+          },
+          suggestions: [`Top ${displayName} companies by adoption`, `How many ${displayName} companies are live?`, 'Show company stats'],
+        }
+      }
+      return await buildNotFoundWithSuggestions(partnershipName, query)
+    }
+  }
+
   // 0b. "[X] companies" or "list [X] companies" e.g. "OSV companies", "list OSV companies" - total number + View list + open sidebar
   const listPartnershipMatch = lowerQuery.match(/^list\s+(.+?)\s+companies\s*\.?$/i)
   const partnershipOnlyMatch = lowerQuery.match(/^(?!how many)(.+?)\s+companies\s*\.?$/i)
@@ -1515,18 +1785,18 @@ async function handleCompanyQuery(query) {
         },
         suggestions: ['Show top companies by adoption', 'Show top companies by transfers', 'Show company stats'],
       }
-    } else if (/(?:daily|weekly|monthly)\s+active\s+users?\s+(?:at|for|of)\s+/i.test(lowerQuery)) {
-      // "weekly active users at Crate and Barrel" — company-specific active users
-      const companyMatch = lowerQuery.match(/(?:daily|weekly|monthly)\s+active\s+users?\s+(?:at|for|of)\s+(.+?)[\s.?]*$/i)
+    } else if (/(?:daily|weekly|monthly)\s+active\s+(?:app\s+)?users?\s+(?:at|for|of)\s+/i.test(lowerQuery)) {
+      // "weekly active users at Crate and Barrel" or "weekly active app users at OSV"
+      const companyMatch = lowerQuery.match(/(?:daily|weekly|monthly)\s+active\s+(?:app\s+)?users?\s+(?:at|for|of)\s+(.+?)[\s.?]*$/i)
       const metricType = /daily/i.test(lowerQuery) ? 'daily' : /weekly/i.test(lowerQuery) ? 'weekly' : 'monthly'
       const metricKey = metricType === 'daily' ? 'daily_active_app_users' : metricType === 'weekly' ? 'weekly_active_app_users' : 'monthly_active_app_users'
-      const metricLabel = `${metricType.charAt(0).toUpperCase() + metricType.slice(1)} Active Users`
+      const metricLabel = `${metricType.charAt(0).toUpperCase() + metricType.slice(1)} Active App Users`
       if (companyMatch) {
-        const companyName = companyMatch[1].trim()
-        const stats = await pennyDataService.getCompanyStats(companyName)
+        const targetName = companyMatch[1].trim()
+        // Try company first
+        const stats = await pennyDataService.getCompanyStats(targetName)
         if (stats) {
           const value = stats[metricKey] ?? 0
-          // Also get employee list for this company
           const employees = await pennyDataService.getEmployeesByCompany(stats.company)
           const activeEmps = employees.filter(e => !e.paused)
           const expandList = activeEmps.length > 0 ? {
@@ -1543,102 +1813,95 @@ async function handleCompanyQuery(query) {
             text: `**${stats.company}** has **${value.toLocaleString()}** ${metricLabel.toLowerCase()}.${activeEmps.length > 0 ? `\n\n${activeEmps.length} active employees at this company.` : ''}`,
             richContent: {
               type: 'data-card',
-              data: {
-                value: value.toLocaleString(),
-                label: metricLabel,
-                detail: stats.company,
-              },
+              data: { value: value.toLocaleString(), label: metricLabel, detail: stats.company },
               ...(expandList && { expandList }),
             },
             suggestions: [`Tell me about ${stats.company}`, `Show ${stats.company} employees`, 'Show company stats'],
           }
-        } else {
-          return await buildNotFoundWithSuggestions(companyName, query)
+        }
+        // Try partnership
+        const byPartnership = await pennyDataService.getCompaniesByPartnership(targetName)
+        if (byPartnership.length > 0) {
+          const partnershipName = byPartnership[0].partnership || targetName
+          const sorted = [...byPartnership].sort((a, b) => (b[metricKey] ?? 0) - (a[metricKey] ?? 0))
+          const top15 = sorted.slice(0, 15)
+          const total = sorted.reduce((sum, c) => sum + (c[metricKey] ?? 0), 0)
+          const list = top15.map((c, i) => `${i + 1}. **${c.company}**: ${(c[metricKey] ?? 0).toLocaleString()}`).join('\n')
+          const expandList = {
+            type: 'table',
+            title: `${partnershipName} companies by ${metricLabel.toLowerCase()}`,
+            data: {
+              headers: ['Company', 'Partnership', metricLabel, 'Adoption', 'Sector'],
+              rows: sorted.map(c => [c.company || '—', c.partnership || '—', (c[metricKey] ?? 0).toLocaleString(), `${((c.adoption_rate ?? 0) * 100).toFixed(1)}%`, c.sector || '—']),
+            },
+          }
+          return {
+            text: `**Top ${partnershipName} Companies by ${metricLabel}:**\n\nTotal: **${total.toLocaleString()}** across ${sorted.length} companies.\n\n${list}`,
+            richContent: {
+              type: 'data-card',
+              data: { value: total.toLocaleString(), label: `${metricLabel} (${partnershipName})`, detail: `${sorted.length} companies` },
+              expandList,
+            },
+            suggestions: [`Tell me about ${partnershipName}`, `Top ${partnershipName} companies by adoption`, 'Show company stats'],
+          }
+        }
+        return await buildNotFoundWithSuggestions(targetName, query)
+      }
+    } else if (lowerQuery.includes('daily active') || lowerQuery.includes('weekly active') || lowerQuery.includes('monthly active')) {
+      // Determine metric type
+      const _metricType = /daily/i.test(lowerQuery) ? 'daily' : /weekly/i.test(lowerQuery) ? 'weekly' : 'monthly'
+      const _metricKey = _metricType === 'daily' ? 'daily_active_app_users' : _metricType === 'weekly' ? 'weekly_active_app_users' : 'monthly_active_app_users'
+      const _metricLabel = `${_metricType.charAt(0).toUpperCase() + _metricType.slice(1)} Active App Users`
+      const _getAll = _metricType === 'daily' ? () => pennyDataService.getTopCompaniesByDailyActiveUsers(9999)
+        : _metricType === 'weekly' ? () => pennyDataService.getTopCompaniesByWeeklyActiveUsers(9999)
+        : () => pennyDataService.getTopCompaniesByMonthlyActiveUsers(9999)
+
+      // Check for partnership filter: "at OSV", "for Harri Pay", or "top OSV companies by..."
+      const partnershipSuffix = lowerQuery.match(/(?:at|for|of)\s+([a-z][\w\s]+?)[\s.?]*$/i)
+      const partnershipPrefix = lowerQuery.match(/(?:top|best|highest)\s+(.+?)\s+companies?\s+by/i)
+      const partnershipHint = partnershipSuffix?.[1]?.trim() || partnershipPrefix?.[1]?.trim() || null
+      let filteredCompanies = null
+      let partnershipLabel = null
+      if (partnershipHint) {
+        const byPartnership = await pennyDataService.getCompaniesByPartnership(partnershipHint)
+        if (byPartnership.length > 0) {
+          filteredCompanies = [...byPartnership].sort((a, b) => (b[_metricKey] ?? 0) - (a[_metricKey] ?? 0))
+          partnershipLabel = byPartnership[0].partnership || partnershipHint
         }
       }
-    } else if (lowerQuery.includes('daily active')) {
-      const allCompanies = await pennyDataService.getTopCompaniesByDailyActiveUsers(9999)
+
+      const allCompanies = filteredCompanies || await _getAll()
       const topCompanies = allCompanies.slice(0, 15)
-      const totalDaily = allCompanies.reduce((sum, c) => sum + (c.daily_active_app_users ?? 0), 0)
+      const total = allCompanies.reduce((sum, c) => sum + (c[_metricKey] ?? 0), 0)
       const list = topCompanies.map((c, i) =>
-        `${i + 1}. **${c.company}**: ${(c.daily_active_app_users ?? 0).toLocaleString()} daily active`
+        `${i + 1}. **${c.company}**: ${(c[_metricKey] ?? 0).toLocaleString()} ${_metricType} active`
       ).join('\n')
       const expandList = allCompanies.length > 0 ? {
         type: 'table',
-        title: 'All companies by daily active app users',
+        title: `${partnershipLabel ? `${partnershipLabel} companies` : 'All companies'} by ${_metricLabel.toLowerCase()}`,
         data: {
-          headers: ['Company', 'Partnership', 'Daily Active Users', 'Sector'],
-          rows: allCompanies.map(c => [c.company || '—', c.partnership || '—', (c.daily_active_app_users ?? 0).toLocaleString(), c.sector || '—']),
+          headers: ['Company', 'Partnership', _metricLabel, 'Sector'],
+          rows: allCompanies.map(c => [c.company || '—', c.partnership || '—', (c[_metricKey] ?? 0).toLocaleString(), c.sector || '—']),
         },
       } : null
+      const titleLabel = partnershipLabel ? `Top ${partnershipLabel} Companies` : 'Top Companies'
       return {
-        text: `**Top Companies by Daily Active App Users:**\n\nTotal: **${totalDaily.toLocaleString()}** daily active users across ${allCompanies.length} clients.\n\n${list}`,
+        text: `**${titleLabel} by ${_metricLabel}:**\n\nTotal: **${total.toLocaleString()}** ${_metricType} active users across ${allCompanies.length} ${partnershipLabel ? `${partnershipLabel} ` : ''}clients.\n\n${list}`,
         richContent: {
           type: 'data-card',
           data: {
-            value: allCompanies.length ? totalDaily.toLocaleString() : '—',
-            label: 'Total daily active users',
+            value: allCompanies.length ? total.toLocaleString() : '—',
+            label: `Total ${_metricType} active users${partnershipLabel ? ` (${partnershipLabel})` : ''}`,
             detail: `${allCompanies.length} clients`,
           },
           ...(expandList && { expandList }),
         },
-        suggestions: ['Top companies by weekly active users', 'Top companies by monthly active users', 'Show company stats'],
-      }
-    } else if (lowerQuery.includes('weekly active')) {
-      const allCompanies = await pennyDataService.getTopCompaniesByWeeklyActiveUsers(9999)
-      const topCompanies = allCompanies.slice(0, 15)
-      const totalWeekly = allCompanies.reduce((sum, c) => sum + (c.weekly_active_app_users ?? 0), 0)
-      const list = topCompanies.map((c, i) =>
-        `${i + 1}. **${c.company}**: ${(c.weekly_active_app_users ?? 0).toLocaleString()} weekly active`
-      ).join('\n')
-      const expandList = allCompanies.length > 0 ? {
-        type: 'table',
-        title: 'All companies by weekly active app users',
-        data: {
-          headers: ['Company', 'Partnership', 'Weekly Active Users', 'Sector'],
-          rows: allCompanies.map(c => [c.company || '—', c.partnership || '—', (c.weekly_active_app_users ?? 0).toLocaleString(), c.sector || '—']),
-        },
-      } : null
-      return {
-        text: `**Top Companies by Weekly Active App Users:**\n\nTotal: **${totalWeekly.toLocaleString()}** weekly active users across ${allCompanies.length} clients.\n\n${list}`,
-        richContent: {
-          type: 'data-card',
-          data: {
-            value: allCompanies.length ? totalWeekly.toLocaleString() : '—',
-            label: 'Total weekly active users',
-            detail: `${allCompanies.length} clients`,
-          },
-          ...(expandList && { expandList }),
-        },
-        suggestions: ['Top companies by daily active users', 'Top companies by monthly active users', 'Show company stats'],
-      }
-    } else if (lowerQuery.includes('monthly active')) {
-      const allCompanies = await pennyDataService.getTopCompaniesByMonthlyActiveUsers(9999)
-      const topCompanies = allCompanies.slice(0, 15)
-      const totalMonthly = allCompanies.reduce((sum, c) => sum + (c.monthly_active_app_users ?? 0), 0)
-      const list = topCompanies.map((c, i) =>
-        `${i + 1}. **${c.company}**: ${(c.monthly_active_app_users ?? 0).toLocaleString()} monthly active`
-      ).join('\n')
-      const expandList = allCompanies.length > 0 ? {
-        type: 'table',
-        title: 'All companies by monthly active app users',
-        data: {
-          headers: ['Company', 'Partnership', 'Monthly Active Users', 'Sector'],
-          rows: allCompanies.map(c => [c.company || '—', c.partnership || '—', (c.monthly_active_app_users ?? 0).toLocaleString(), c.sector || '—']),
-        },
-      } : null
-      return {
-        text: `**Top Companies by Monthly Active App Users:**\n\nTotal: **${totalMonthly.toLocaleString()}** monthly active users across ${allCompanies.length} clients.\n\n${list}`,
-        richContent: {
-          type: 'data-card',
-          data: {
-            value: allCompanies.length ? totalMonthly.toLocaleString() : '—',
-            label: 'Total monthly active users',
-            detail: `${allCompanies.length} clients`,
-          },
-          ...(expandList && { expandList }),
-        },
-        suggestions: ['Top companies by daily active users', 'Top companies by weekly active users', 'Show company stats'],
+        suggestions: [
+          _metricType !== 'daily' ? `Top ${partnershipLabel || ''} companies by daily active users`.trim() : null,
+          _metricType !== 'weekly' ? `Top ${partnershipLabel || ''} companies by weekly active users`.trim() : null,
+          _metricType !== 'monthly' ? `Top ${partnershipLabel || ''} companies by monthly active users`.trim() : null,
+          'Show company stats',
+        ].filter(Boolean),
       }
     } else if (lowerQuery.includes('active')) {
       const allCompanies = await pennyDataService.getTopCompaniesByActiveUsers(9999)
@@ -2287,234 +2550,23 @@ async function handleCompanyQuery(query) {
 
     // --- End Issue 4 per-company sub-handlers ---
 
-    const companyName = stats.company
-    const admins = await pennyDataService.getAdminsByCompany(companyName)
-    const employeeStats = await pennyDataService.getCompanyEmployeeStats(companyName)
-    const outstandingBalanceTotal = employeeStats ? employeeStats.totalOutstandingBalance : 0
-    const employeesWithBalance = employeeStats ? (employeeStats.employees || []).filter(e => (e.outstanding_balance || 0) > 0) : []
-    const outstandingBalanceExpandList = {
-      type: 'table',
-      title: `Outstanding at ${companyName}`,
-      data: {
-        headers: ['Name', 'Outstanding Balance', 'Company'],
-        rows: employeesWithBalance.sort((a, b) => (b.outstanding_balance || 0) - (a.outstanding_balance || 0)).map(e => [e.full_name, `$${(e.outstanding_balance || 0).toFixed(2)}`, e.company || '—']),
-        employeeNames: employeesWithBalance.map(e => e.full_name),
-        rawEmployees: employeesWithBalance,
-      },
-      amountColumnIndex: 1,
-      totalLabel: 'Total outstanding',
-    }
-    const activeEmployees = employeeStats ? (employeeStats.employees || []).filter(e => !e.paused) : []
-    const activeUsersExpandList = {
-      type: 'table',
-      title: `Active Users at ${companyName}`,
-      data: {
-        headers: ['Name', 'Status', 'Transfers (90d)', 'Volume (90d)', 'Company'],
-        rows: activeEmployees.map(e => [e.full_name, e.current_state || 'Active', (e.transfers_90d || 0).toLocaleString(), `$${(e.volume_90d_usd || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, e.company || '—']),
-        employeeNames: activeEmployees.map(e => e.full_name),
-        rawEmployees: activeEmployees,
-      },
-    }
-    const partnershipName = (stats.partnership != null && String(stats.partnership).trim()) ? String(stats.partnership).trim() : null
-    let partnershipExpandList = null
-    if (partnershipName) {
-      const companiesInPartnership = await pennyDataService.getCompaniesByPartnership(partnershipName)
-      if (companiesInPartnership.length > 0) {
-        partnershipExpandList = {
-          type: 'table',
-          title: `Companies in ${partnershipName}`,
-          data: {
-            headers: ['Company', 'Partnership'],
-            rows: companiesInPartnership.map(c => [c.company || '—', c.partnership || '—']),
-            rawCompanies: companiesInPartnership,
-          },
-        }
-      }
-    }
-    const adoptedEmployees = employeeStats?.employees || []
-    const adoptedExpandList = adoptedEmployees.length > 0 ? {
-      type: 'table',
-      title: `Adopted at ${companyName}`,
-      data: {
-        headers: ['Name', 'Status', 'Transfers (90d)', 'Company'],
-        rows: adoptedEmployees.map(e => [e.full_name, e.current_state || '—', (e.transfers_90d || 0).toLocaleString(), e.company || '—']),
-        employeeNames: adoptedEmployees.map(e => e.full_name),
-        rawEmployees: adoptedEmployees,
-      },
-    } : null
-    const eligibleExpandList = adoptedEmployees.length > 0 ? {
-      type: 'table',
-      title: `Employees at ${companyName}`,
-      data: {
-        headers: ['Name', 'Status', 'Pay Type', 'Company'],
-        rows: adoptedEmployees.map(e => [e.full_name, e.current_state || '—', e.salary_or_hourly || '—', e.company || '—']),
-        employeeNames: adoptedEmployees.map(e => e.full_name),
-        rawEmployees: adoptedEmployees,
-      },
-    } : null
-    // Transfers expand list — employees at this company sorted by transfers
-    const transferEmployees = (employeeStats?.employees || []).filter(e => (e.transfers_90d || 0) > 0 || (e.lifetime_total_transfers || 0) > 0).sort((a, b) => (b.transfers_90d || 0) - (a.transfers_90d || 0))
-    const transfersExpandList = transferEmployees.length > 0 ? {
-      type: 'table',
-      title: `Employees with transfers at ${companyName}`,
-      data: {
-        headers: ['Employee', 'Transfers (90d)', 'Volume (90d)', 'Company'],
-        rows: transferEmployees.map(e => [e.full_name || '—', (e.transfers_90d || 0).toLocaleString(), `$${(e.volume_90d_usd || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, e.company || '—']),
-        employeeNames: transferEmployees.map(e => e.full_name),
-        rawEmployees: transferEmployees,
-      },
-      amountColumnIndex: 2,
-      totalLabel: 'Total volume (90d)',
-    } : null
-    // Savings expand list — employees with savings accounts
-    const savingsEmployees = (employeeStats?.employees || []).filter(e => e.has_savings_acct || (e.save_balance || 0) > 0).sort((a, b) => (b.save_balance || 0) - (a.save_balance || 0))
-    let savingsExpandList = savingsEmployees.length > 0 ? {
-      type: 'table',
-      title: `Savings accounts at ${companyName}`,
-      data: {
-        headers: ['Employee', 'Save Balance', 'Company'],
-        rows: savingsEmployees.map(e => [e.full_name || '—', `$${(e.save_balance || 0).toFixed(2)}`, e.company || '—']),
-        employeeNames: savingsEmployees.map(e => e.full_name),
-        rawEmployees: savingsEmployees,
-      },
-      amountColumnIndex: 1,
-      totalLabel: 'Total saved',
-    } : null
-    // Fallback: if Redash shows active_savings_accounts > 0 but no employee-level data matches, show all employees
-    if (!savingsExpandList && stats.active_savings_accounts > 0) {
-      const allEmps = employeeStats?.employees || []
-      if (allEmps.length > 0) {
-        savingsExpandList = {
-          type: 'table',
-          title: `Employees at ${companyName} (${stats.active_savings_accounts} savings accounts per aggregate data)`,
-          data: {
-            headers: ['Employee', 'Save Balance', 'Company'],
-            rows: allEmps.map(e => [e.full_name || '—', `$${(e.save_balance || 0).toFixed(2)}`, e.company || '—']),
-            employeeNames: allEmps.map(e => e.full_name),
-            rawEmployees: allEmps,
-          },
-          amountColumnIndex: 1,
-          totalLabel: 'Total saved',
-        }
-      }
-    }
-    // CSM expand list
-    const csmName = (stats.csm_owner || '').trim()
-    let csmExpandList = null
-    if (csmName) {
-      const csmCompanies = await pennyDataService.getCompaniesByCsmOwner(csmName)
-      if (csmCompanies.length > 0) {
-        csmExpandList = { type: 'table', title: `Accounts managed by ${csmName} (CSM)`, data: { headers: ['Company', 'Partnership', 'Adoption'], rows: csmCompanies.map(c => [c.company || '—', c.partnership || '—', `${((c.adoption_rate ?? 0) * 100).toFixed(1)}%`]), rawCompanies: csmCompanies } }
-      }
-    }
-    // DM expand list
-    const dmName = (stats.delivery_manager || '').trim()
-    let dmExpandList = null
-    if (dmName) {
-      const dmCompanies = await pennyDataService.getCompaniesByDeliveryManager(dmName)
-      if (dmCompanies.length > 0) {
-        dmExpandList = { type: 'table', title: `Accounts launched by ${dmName} (DM)`, data: { headers: ['Company', 'Partnership', 'Adoption'], rows: dmCompanies.map(c => [c.company || '—', c.partnership || '—', `${((c.adoption_rate ?? 0) * 100).toFixed(1)}%`]), rawCompanies: dmCompanies } }
-      }
-    }
-    // Pending expand list — employees with current_state matching 'pending' at this company
-    const pendingEmployees = (employeeStats?.employees || []).filter(e => (e.current_state || '').toLowerCase() === 'pending')
-    let pendingExpandList = pendingEmployees.length > 0 ? {
-      type: 'table',
-      title: `Pending employees at ${companyName}`,
-      data: {
-        headers: ['Name', 'Status', 'Pay Type', 'Company'],
-        rows: pendingEmployees.map(e => [e.full_name || '—', 'Pending', e.salary_or_hourly || '—', e.company || '—']),
-        employeeNames: pendingEmployees.map(e => e.full_name),
-        rawEmployees: pendingEmployees,
-      },
-    } : null
-    // Fallback: if Redash shows pending > 0 but no employee-level data matches, show all employees
-    if (!pendingExpandList && stats.pending > 0) {
-      const allEmps = employeeStats?.employees || []
-      if (allEmps.length > 0) {
-        pendingExpandList = {
-          type: 'table',
-          title: `Employees at ${companyName} (${stats.pending} pending per aggregate data)`,
-          data: {
-            headers: ['Name', 'Status', 'Pay Type', 'Company'],
-            rows: allEmps.map(e => [e.full_name || '—', e.current_state || '—', e.salary_or_hourly || '—', e.company || '—']),
-            employeeNames: allEmps.map(e => e.full_name),
-            rawEmployees: allEmps,
-          },
-        }
-      }
-    }
-    // Enrolling expand list — employees with current_state matching 'enrolling' at this company
-    const enrollingEmployees = (employeeStats?.employees || []).filter(e => (e.current_state || '').toLowerCase() === 'enrolling')
-    const enrollingExpandList = enrollingEmployees.length > 0 ? {
-      type: 'table',
-      title: `Enrolling employees at ${companyName}`,
-      data: {
-        headers: ['Name', 'Status', 'Pay Type', 'Company'],
-        rows: enrollingEmployees.map(e => [e.full_name || '—', 'Enrolling', e.salary_or_hourly || '—', e.company || '—']),
-        employeeNames: enrollingEmployees.map(e => e.full_name),
-        rawEmployees: enrollingEmployees,
-      },
-    } : null
-    // Paused expand list — employees with paused === true at this company
-    const pausedEmployees = (employeeStats?.employees || []).filter(e => e.paused === true)
-    const pausedExpandList = pausedEmployees.length > 0 ? {
-      type: 'table',
-      title: `Paused employees at ${companyName}`,
-      data: {
-        headers: ['Name', 'Company', 'Pause Reason', 'Status'],
-        rows: pausedEmployees.map(e => [e.full_name || '—', e.company || '—', e.pause_reason || '—', 'Paused']),
-        employeeNames: pausedEmployees.map(e => e.full_name),
-        rawEmployees: pausedEmployees,
-      },
-    } : null
-    const pausedCount = pausedEmployees.length
-    // Credit score expand list — ALL companies with credit scores (global list)
-    let creditScoreExpandList = null
-    if (stats.credit_score) {
-      const csCompanies = await pennyDataService.getCompaniesWithCreditScores()
-      if (csCompanies.length > 0) {
-        creditScoreExpandList = {
-          type: 'table',
-          title: 'All companies with credit scores',
-          data: {
-            headers: ['Company', 'Credit Score', 'Partnership', 'Adoption'],
-            rows: csCompanies.map(c => [c.company || '—', String(c.credit_score), c.partnership || '—', `${((c.adoption_rate ?? 0) * 100).toFixed(1)}%`]),
-            rawCompanies: csCompanies,
-          },
-        }
-      }
-    }
+    // Build all expand lists via the shared enrichCompanyCard helper
+    const enriched = await enrichCompanyCard(stats)
     return {
       text: `Here's an overview of **${stats.company}** — adoption is at **${stats.adoption_rate_percent}** with **${stats.adopted}** enrolled out of **${stats.eligible}** eligible employees.`,
       richContent: {
         type: 'company-stats-card',
         data: {
           ...stats,
-          admins,
-          outstandingBalanceTotal,
-          outstandingBalanceExpandList,
-          activeUsersExpandList,
-          ...(partnershipExpandList && { partnershipExpandList }),
-          ...(adoptedExpandList && { adoptedExpandList }),
-          ...(eligibleExpandList && { eligibleExpandList }),
-          ...(csmExpandList && { csmExpandList }),
-          ...(dmExpandList && { dmExpandList }),
-          ...(transfersExpandList && { transfersExpandList }),
-          ...(savingsExpandList && { savingsExpandList }),
-          ...(pendingExpandList && { pendingExpandList }),
-          ...(enrollingExpandList && { enrollingExpandList }),
-          ...(pausedExpandList && { pausedExpandList }),
-          pausedCount,
-          ...(creditScoreExpandList && { creditScoreExpandList }),
+          ...enriched,
         },
       },
       suggestions: [
-        `Outstanding at ${companyName}`,
-        `Savings at ${companyName}`,
-        `Transfers at ${companyName}`,
-        `Weekly active users at ${companyName}`,
-        `Employees at ${companyName}`,
+        `Outstanding at ${stats.company}`,
+        `Savings at ${stats.company}`,
+        `Transfers at ${stats.company}`,
+        `Weekly active users at ${stats.company}`,
+        `Employees at ${stats.company}`,
       ],
     }
   }
@@ -2833,12 +2885,16 @@ async function handleCsmDmQuery(query) {
     return await buildNotFoundWithSuggestions(personName, query)
   }
 
-  const headers = ['Company', 'Partnership', 'Role', 'Adoption']
+  const _fmtLd = (d) => { if (!d) return '—'; const dt = new Date(d); return Number.isNaN(dt.getTime()) ? String(d) : dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) }
+  const _fmtRev = (v) => v != null && Number.isFinite(Number(v)) && Number(v) !== 0 ? `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
+  const headers = ['Company', 'Partnership', 'Role', 'Adoption', 'Net Rev (30d)', 'Launch Date']
   const rows = allCompanies.map(c => [
     c.company || '—',
     c.partnership || '—',
     c.role,
     `${((c.adoption_rate ?? 0) * 100).toFixed(1)}%`,
+    _fmtRev(c.sum_trailing_30d_net_rev),
+    _fmtLd(c.launch_date),
   ])
   const expandList = {
     type: 'table',
@@ -3135,6 +3191,9 @@ const queryHandlers = [
         }
       }
 
+      // Shared formatter for currency values used in sub-handlers below
+      const fmtCur = (v) => `$${(v ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
       // --- Per-company sub-handlers (must come BEFORE generic "active" handler) ---
 
       // Daily/weekly/monthly active app users at [company]
@@ -3323,6 +3382,24 @@ const queryHandlers = [
             dm ? `Who does ${dm} manage?` : null,
             `Tell me about ${displayName}`,
           ].filter(Boolean),
+        }
+      }
+
+      // New joiners at [company]
+      if (lowerQuery.includes('new joiner') || lowerQuery.includes('recent joiner')) {
+        const newJoiners = summary.new_joiners_in_period ?? 0
+        const newJoinersEnrolled30d = summary.new_joiners_enrolled_in_30d_in_period ?? 0
+        let text = `**${displayName}** has **${newJoiners.toLocaleString()}** new joiner${newJoiners !== 1 ? 's' : ''} in the current period.`
+        if (newJoinersEnrolled30d > 0) {
+          text += `\n\nOf those, **${newJoinersEnrolled30d.toLocaleString()}** enrolled within 30 days.`
+        }
+        return {
+          text,
+          richContent: {
+            type: 'data-card',
+            data: { value: newJoiners.toLocaleString(), label: 'New Joiners', detail: displayName },
+          },
+          suggestions: [`Tell me about ${displayName}`, `Active users at ${displayName}`, `Employees at ${displayName}`],
         }
       }
 
@@ -3706,7 +3783,9 @@ const queryHandlers = [
       if (csmNameSummary) {
         const csmComps = await pennyDataService.getCompaniesByCsmOwner(csmNameSummary)
         if (csmComps.length > 0) {
-          csmExpandListSummary = { type: 'table', title: `Accounts managed by ${csmNameSummary} (CSM)`, data: { headers: ['Company', 'Partnership', 'Adoption'], rows: csmComps.map(c => [c.company || '—', c.partnership || '—', `${((c.adoption_rate ?? 0) * 100).toFixed(1)}%`]) } }
+          const _fmtLd = (d) => { if (!d) return '—'; const dt = new Date(d); return Number.isNaN(dt.getTime()) ? String(d) : dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) }
+          const _fmtRev = (v) => v != null && Number.isFinite(Number(v)) && Number(v) !== 0 ? `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
+          csmExpandListSummary = { type: 'table', title: `Accounts managed by ${csmNameSummary} (CSM)`, data: { headers: ['Company', 'Partnership', 'Adoption', 'Net Rev (30d)', 'Launch Date'], rows: csmComps.map(c => [c.company || '—', c.partnership || '—', `${((c.adoption_rate ?? 0) * 100).toFixed(1)}%`, _fmtRev(c.sum_trailing_30d_net_rev), _fmtLd(c.launch_date)]) } }
         }
       }
       // DM expand list
@@ -3715,7 +3794,9 @@ const queryHandlers = [
       if (dmNameSummary) {
         const dmComps = await pennyDataService.getCompaniesByDeliveryManager(dmNameSummary)
         if (dmComps.length > 0) {
-          dmExpandListSummary = { type: 'table', title: `Accounts launched by ${dmNameSummary} (DM)`, data: { headers: ['Company', 'Partnership', 'Adoption'], rows: dmComps.map(c => [c.company || '—', c.partnership || '—', `${((c.adoption_rate ?? 0) * 100).toFixed(1)}%`]) } }
+          const _fmtLd = (d) => { if (!d) return '—'; const dt = new Date(d); return Number.isNaN(dt.getTime()) ? String(d) : dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) }
+          const _fmtRev = (v) => v != null && Number.isFinite(Number(v)) && Number(v) !== 0 ? `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
+          dmExpandListSummary = { type: 'table', title: `Accounts launched by ${dmNameSummary} (DM)`, data: { headers: ['Company', 'Partnership', 'Adoption', 'Net Rev (30d)', 'Launch Date'], rows: dmComps.map(c => [c.company || '—', c.partnership || '—', `${((c.adoption_rate ?? 0) * 100).toFixed(1)}%`, _fmtRev(c.sum_trailing_30d_net_rev), _fmtLd(c.launch_date)]) } }
         }
       }
       return {
@@ -3785,62 +3866,13 @@ const queryHandlers = [
             if (launchDate) text += ` on **${launchDate}**`
             text += '.'
 
-            // Build full card data (same as "tell me about" handler)
-            const admins = await pennyDataService.getAdminsByCompany(stats.company)
-            const employeeStats = await pennyDataService.getCompanyEmployeeStats(stats.company)
-            const outstandingBalanceTotal = employeeStats ? employeeStats.totalOutstandingBalance : 0
-            const employeesWithBalance = employeeStats ? (employeeStats.employees || []).filter(e => (e.outstanding_balance || 0) > 0) : []
-            const outstandingBalanceExpandList = {
-              type: 'table', title: `Outstanding at ${stats.company}`,
-              data: { headers: ['Name', 'Outstanding Balance', 'Company'], rows: employeesWithBalance.sort((a, b) => (b.outstanding_balance || 0) - (a.outstanding_balance || 0)).map(e => [e.full_name, `$${(e.outstanding_balance || 0).toFixed(2)}`, e.company || '—']), employeeNames: employeesWithBalance.map(e => e.full_name), rawEmployees: employeesWithBalance },
-              amountColumnIndex: 1, totalLabel: 'Total outstanding',
-            }
-            const activeEmployees = employeeStats ? (employeeStats.employees || []).filter(e => !e.paused) : []
-            const activeUsersExpandList = { type: 'table', title: `Active Users at ${stats.company}`, data: { headers: ['Name', 'Status', 'Transfers (90d)', 'Volume (90d)', 'Company'], rows: activeEmployees.map(e => [e.full_name, e.current_state || 'Active', (e.transfers_90d || 0).toLocaleString(), `$${(e.volume_90d_usd || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, e.company || '—']), employeeNames: activeEmployees.map(e => e.full_name), rawEmployees: activeEmployees } }
-            const adoptedEmployees = employeeStats?.employees || []
-            const adoptedExpandList = adoptedEmployees.length > 0 ? { type: 'table', title: `Adopted at ${stats.company}`, data: { headers: ['Name', 'Status', 'Transfers (90d)', 'Company'], rows: adoptedEmployees.map(e => [e.full_name, e.current_state || '—', (e.transfers_90d || 0).toLocaleString(), e.company || '—']), employeeNames: adoptedEmployees.map(e => e.full_name), rawEmployees: adoptedEmployees } } : null
-            const eligibleExpandList = adoptedEmployees.length > 0 ? { type: 'table', title: `Employees at ${stats.company}`, data: { headers: ['Name', 'Status', 'Pay Type', 'Company'], rows: adoptedEmployees.map(e => [e.full_name, e.current_state || '—', e.salary_or_hourly || '—', e.company || '—']), employeeNames: adoptedEmployees.map(e => e.full_name), rawEmployees: adoptedEmployees } } : null
-            const partnershipName = (stats.partnership != null && String(stats.partnership).trim()) ? String(stats.partnership).trim() : null
-            let partnershipExpandList = null
-            if (partnershipName) {
-              const companiesInPartnership = await pennyDataService.getCompaniesByPartnership(partnershipName)
-              if (companiesInPartnership.length > 0) {
-                partnershipExpandList = { type: 'table', title: `Companies in ${partnershipName}`, data: { headers: ['Company', 'Partnership'], rows: companiesInPartnership.map(c => [c.company || '—', c.partnership || '—']) } }
-              }
-            }
-            // CSM expand list
-            let csmExpandList = null
-            if (csm) {
-              const csmCompanies = await pennyDataService.getCompaniesByCsmOwner(csm)
-              if (csmCompanies.length > 0) {
-                csmExpandList = { type: 'table', title: `Accounts managed by ${csm} (CSM)`, data: { headers: ['Company', 'Partnership', 'Adoption'], rows: csmCompanies.map(c => [c.company || '—', c.partnership || '—', `${((c.adoption_rate ?? 0) * 100).toFixed(1)}%`]) } }
-              }
-            }
-            // DM expand list
-            let dmExpandList = null
-            if (dm) {
-              const dmCompanies = await pennyDataService.getCompaniesByDeliveryManager(dm)
-              if (dmCompanies.length > 0) {
-                dmExpandList = { type: 'table', title: `Accounts launched by ${dm} (DM)`, data: { headers: ['Company', 'Partnership', 'Adoption'], rows: dmCompanies.map(c => [c.company || '—', c.partnership || '—', `${((c.adoption_rate ?? 0) * 100).toFixed(1)}%`]) } }
-              }
-            }
-
             return {
               text,
               richContent: {
                 type: 'company-stats-card',
                 data: {
                   ...stats,
-                  admins,
-                  outstandingBalanceTotal,
-                  outstandingBalanceExpandList,
-                  activeUsersExpandList,
-                  ...(partnershipExpandList && { partnershipExpandList }),
-                  ...(adoptedExpandList && { adoptedExpandList }),
-                  ...(eligibleExpandList && { eligibleExpandList }),
-                  ...(csmExpandList && { csmExpandList }),
-                  ...(dmExpandList && { dmExpandList }),
-                  ...(await enrichWithPausedCount(stats)),
+                  ...(await enrichCompanyCard(stats)),
                 },
               },
               suggestions: [
@@ -3904,8 +3936,8 @@ const queryHandlers = [
   {
     patterns: [
       /how much (?:does|did) (.+?) owe/i,
-      /(?:what(?:'s| is))? (.+?)(?:'s)? (?:outstanding )?balance/i,
-      /does (.+?) have (?:an? )?(?:outstanding )?balance/i,
+      /(?:what(?:'s| is))? (.+?)(?:'s)? (?:outstanding )?balance\s*\??$/i,
+      /does (.+?) have (?:an? )?(?:outstanding )?balance\s*\??$/i,
     ],
     handler: async (query, matches) => {
       const q = query.toLowerCase()
@@ -3914,8 +3946,16 @@ const queryHandlers = [
       const name = cleanEmployeeNameFromQuery(rawName)
       if (!name || name.length < 2) return null
 
-      const skipWords = ['the', 'total', 'all', 'our', 'my', 'this', 'outstanding', 'current', 'show']
+      const skipWords = ['the', 'total', 'all', 'our', 'my', 'this', 'outstanding', 'current', 'show',
+        'users', 'employees', 'staff', 'people', 'active', 'enrolled', 'paused', 'company', 'companies']
       if (skipWords.includes(name.toLowerCase())) return null
+
+      // Guard: if extracted name matches a company (and NOT an employee), bail — let company handler deal with it
+      const maybeCompany = await pennyDataService.getCompanyByName(name)
+      if (maybeCompany) {
+        const maybeEmployee = await pennyDataService.getEmployeeByName(name)
+        if (!maybeEmployee) return null
+      }
 
       return await handleOutstandingBalanceQuery(query, name)
     },
@@ -4038,6 +4078,12 @@ const queryHandlers = [
       // "X's transfers" / "Show transfers for X"
       /(.+?)(?:'s)?\s+transfers?\s*\??$/i,
       /(?:show|get)\s+transfers?\s+(?:for|of)\s+(.+?)\s*\??/i,
+      // "When was X's last transfer?" / "X's last transfer" / "last transfer for X"
+      /when\s+was\s+(.+?)(?:'s)?\s+last\s+(?:transfer|stream)\s*\??/i,
+      /(.+?)(?:'s)?\s+last\s+(?:transfer|stream)\s*\??$/i,
+      /last\s+(?:transfer|stream)\s+(?:for|of)\s+(.+?)\s*\??/i,
+      // "How active is X in the last 30 days?" / "How active is X?" / "How active has X been?"
+      /how\s+active\s+(?:is|has\s+been)\s+(.+?)(?:\s+in\s+the\s+(?:last|past)\s+\d+\s+days?)?\s*\??/i,
     ],
     handler: async (query, matches) => {
       const lowerQuery = query.toLowerCase()
@@ -4106,6 +4152,24 @@ const queryHandlers = [
         const m = query.match(/(?:show|get)\s+transfers?\s+(?:for|of)\s+(.+)/i)
         rawName = m?.[1]
         field = 'transfers'
+      // "When was X's last transfer?" / "X's last transfer" / "last transfer for X"
+      } else if (/when\s+was\s+(.+?)(?:'s)?\s+last\s+(?:transfer|stream)/i.test(query)) {
+        const m = query.match(/when\s+was\s+(.+?)(?:'s)?\s+last\s+(?:transfer|stream)/i)
+        rawName = m?.[1]
+        field = 'lasttransfer'
+      } else if (/(.+?)(?:'s)?\s+last\s+(?:transfer|stream)\s*\??$/i.test(query)) {
+        const m = query.match(/(.+?)(?:'s)?\s+last\s+(?:transfer|stream)\s*\??$/i)
+        rawName = m?.[1]
+        field = 'lasttransfer'
+      } else if (/last\s+(?:transfer|stream)\s+(?:for|of)\s+(.+)/i.test(query)) {
+        const m = query.match(/last\s+(?:transfer|stream)\s+(?:for|of)\s+(.+)/i)
+        rawName = m?.[1]
+        field = 'lasttransfer'
+      // "How active is X in the last 30 days?" / "How active is X?" / "How active has X been?"
+      } else if (/how\s+active\s+(?:is|has\s+been)\s+(.+?)(?:\s+in\s+the\s+(?:last|past)\s+\d+\s+days?)?\s*\??/i.test(query)) {
+        const m = query.match(/how\s+active\s+(?:is|has\s+been)\s+(.+?)(?:\s+in\s+the\s+(?:last|past)\s+\d+\s+days?)?\s*\??/i)
+        rawName = m?.[1]
+        field = 'activity'
       } else {
         rawName = matches[1]
         field = (matches[2] || '').toLowerCase().replace(/\s+/g, '')
@@ -4118,11 +4182,10 @@ const queryHandlers = [
       const skipWords = ['the', 'total', 'all', 'our', 'my', 'this', 'outstanding', 'savings', 'show', 'many', 'been', 'average', 'avg', '30', '90']
       if (skipWords.includes(rawName.toLowerCase())) return null
 
-      // If it's a company name and we're looking at transfers, let the transfer handler handle it
+      // If the extracted name matches a known company (and NOT an employee), bail — let company handler deal with it
       const companyCheck = await pennyDataService.getCompanyByName(rawName)
-      if (companyCheck && field === 'transfers') return null
-
       const employee = await pennyDataService.getEmployeeFullDetails(rawName)
+      if (companyCheck && !employee) return null
       if (!employee) {
         return await buildNotFoundWithSuggestions(rawName, query)
       }
@@ -4254,6 +4317,68 @@ const queryHandlers = [
           text,
           richContent: { type: 'employee-card', data: employee },
           suggestions: [`Tell me about ${eName}`, employee.company ? `Transfers at ${employee.company}` : null, `What is ${eName}'s outstanding balance?`].filter(Boolean),
+        }
+      }
+
+      if (field === 'lasttransfer') {
+        const lastStreamRaw = employee.last_stream_date ? String(employee.last_stream_date).trim() : null
+        const fmtCur = (v) => `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        if (lastStreamRaw) {
+          const dt = new Date(lastStreamRaw)
+          const formatted = Number.isNaN(dt.getTime()) ? lastStreamRaw : dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+          const daysAgo = Number.isNaN(dt.getTime()) ? null : Math.floor((Date.now() - dt.getTime()) / 86400000)
+          let text = `**${eName}**'s last transfer was on **${formatted}**`
+          if (daysAgo != null) text += ` (${daysAgo} day${daysAgo !== 1 ? 's' : ''} ago)`
+          text += '.'
+          const xfers30d = employee.transfers_30d != null ? Number(employee.transfers_30d) : 0
+          const vol30d = employee.volume_30d_usd != null ? Number(employee.volume_30d_usd) : 0
+          if (xfers30d > 0) {
+            text += `\n\nLast 30 days: **${xfers30d}** transfers (${fmtCur(vol30d)}).`
+          }
+          return {
+            text,
+            richContent: { type: 'employee-card', data: employee },
+            suggestions: [`${eName}'s transfers`, `Tell me about ${eName}`, employee.company ? `Transfers at ${employee.company}` : null].filter(Boolean),
+          }
+        } else {
+          return {
+            text: `**${eName}** has no transfer date on file.`,
+            richContent: { type: 'employee-card', data: employee },
+            suggestions: [`Tell me about ${eName}`, `${eName}'s transfers`],
+          }
+        }
+      }
+
+      if (field === 'activity') {
+        const fmtCur = (v) => `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        const xfers30d = employee.transfers_30d != null ? Number(employee.transfers_30d) : 0
+        const vol30d = employee.volume_30d_usd != null ? Number(employee.volume_30d_usd) : 0
+        const xfers90d = employee.transfers_90d != null ? Number(employee.transfers_90d) : 0
+        const vol90d = employee.volume_90d_usd != null ? Number(employee.volume_90d_usd) : 0
+        const lastStreamRaw = employee.last_stream_date ? String(employee.last_stream_date).trim() : null
+        const lastStreamFormatted = lastStreamRaw ? (() => {
+          const dt = new Date(lastStreamRaw)
+          return Number.isNaN(dt.getTime()) ? lastStreamRaw : dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+        })() : null
+        const xfers14dDelta = employee.transfers_14d_delta != null ? Number(employee.transfers_14d_delta) : null
+
+        let activityLevel = 'Inactive'
+        if (xfers30d >= 10) activityLevel = 'Very Active'
+        else if (xfers30d >= 4) activityLevel = 'Active'
+        else if (xfers30d >= 1) activityLevel = 'Low Activity'
+
+        let text = `**${eName}** — **${activityLevel}** in the last 30 days.\n\n`
+        text += `• **${xfers30d}** transfers (${fmtCur(vol30d)}) in the last **30 days**\n`
+        text += `• **${xfers90d}** transfers (${fmtCur(vol90d)}) in the last **90 days**`
+        if (lastStreamFormatted) text += `\n• Last transfer: **${lastStreamFormatted}**`
+        if (xfers14dDelta != null && xfers14dDelta !== 0) {
+          text += `\n• 14-day trend: **${xfers14dDelta > 0 ? '+' : ''}${xfers14dDelta}** transfers`
+        }
+
+        return {
+          text,
+          richContent: { type: 'employee-card', data: employee },
+          suggestions: [`${eName}'s transfers`, `Tell me about ${eName}`, employee.company ? `How active is ${employee.company}?` : null].filter(Boolean),
         }
       }
 
@@ -4971,6 +5096,13 @@ const queryHandlers = [
       const skipWords = ['the', 'total', 'all', 'our', 'my', 'current', 'savings stats', 'saving stats', 'save stats', 'stats']
       if (skipWords.includes(name.toLowerCase())) return null
 
+      // Guard: if extracted name matches a company (and NOT an employee), bail — let company handler deal with it
+      const maybeCompany = await pennyDataService.getCompanyByName(name)
+      if (maybeCompany) {
+        const maybeEmployee = await pennyDataService.getEmployeeByName(name)
+        if (!maybeEmployee) return null
+      }
+
       return await handleSavingsQuery(query, name)
     },
   },
@@ -5640,7 +5772,8 @@ const queryHandlers = [
       /(?:how many|number of)?\s*(?:clients?|companies?)\s+in\s+.+\s+partnership/i,
       /(?:in|under)\s+.+\s+partnership/i,
       // "how many transfers (taken) at [company]" -> use Client Summary transfers_in_period
-      /(?:how many|number of|total)?\s*transfers?\s+(?:taken\s+)?(?:at|for|in)\s+.+/i,
+      // NOTE: prefix (how many/number of/total) is REQUIRED — bare "transfers at X" must fall through to handleTransferQuery for clarification
+      /(?:how many|number of|total)\s+transfers?\s+(?:taken\s+)?(?:at|for|in)\s+.+/i,
       /(?:compan|client).*(?:above|below|over|under)\s+\d+(?:\.\d+)?\s*%?\s*(?:percent)?\s*(?:rate\s+)?(?:of\s+)?adoption(?:\s+rate)?/i,
       /(?:show|get|list|what are).*(?:compan|client)/i,
       /(?:compan|client).*(?:stats|statistics|summary|info)/i,
@@ -5656,6 +5789,9 @@ const queryHandlers = [
       // "[X] companies" / "list [X] companies" e.g. "OSV companies", "list OSV companies" -> count + View list + sidebar
       /^(?!how many)(.+?)\s+companies\s*\.?$/i,
       /^list\s+(.+?)\s+companies\s*\.?$/i,
+      // "New joiners at X" / "new joiners for X" / "how many new joiners at X"
+      /(?:new\s+joiners?|recent\s+joiners?)\s+(?:at|for|of|in)\s+.+/i,
+      /(?:how many|number of)\s+new\s+joiners?\s+(?:at|for|of|in)\s+.+/i,
     ],
     handler: async (query) => {
       return await handleCompanyQuery(query)
@@ -5684,7 +5820,7 @@ const queryHandlers = [
     patterns: [
       /(?:tell me about|info on|stats for|how is)\s+(.+?)(?:\s+doing)?$/i,
       // Bare company name (e.g. "nbhf drinks", "cinema tv house") — no leading verb
-      /^(?!show|list|get|how|what|who|tell|give|is|does|has|can|will|top|best|total|overall|current)([a-z0-9][a-z0-9\s\-'.]{1,55})$/i,
+      /^(?!show|list|get|how|what|who|tell|give|is|does|has|can|will|top|best|total|overall|current|transfers?)([a-z0-9][a-z0-9\s\-'.]{1,55})$/i,
     ],
     handler: async (query, matches) => {
       const name = matches[1]?.trim()
@@ -5721,6 +5857,8 @@ const queryHandlers = [
       /^total\s+transfers?\s*$/i,
       /^30\s+day\s+transfers?\s*$/i,
       /^average\s+transfers?\s*$/i,
+      // "transfers at [company]" / "transfers for [company]" — route to transfer handler for clarification flow
+      /^transfers?\s+(?:at|for|in)\s+.+/i,
     ],
     handler: async (query) => {
       return await handleTransferQuery(query)

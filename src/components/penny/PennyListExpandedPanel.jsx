@@ -195,8 +195,8 @@ function PennyListExpandedPanel({ richContent, title = 'Full list', onClose, onE
   }
 
   return (
-    <div className="flex flex-col h-full bg-white border-l border-gray-200 shadow-lg">
-      <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 pt-6 pb-3 border-b border-gray-200 bg-gray-50/80">
+    <div className="flex flex-col h-full bg-white/70 backdrop-blur-2xl border-l border-white/30 shadow-lg">
+      <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 pt-6 pb-3 border-b border-white/30 bg-white/40 backdrop-blur-sm">
         <h3 className="text-sm font-semibold text-gray-800 truncate">{title}</h3>
         <div className="flex items-center gap-1 flex-shrink-0">
           {canExport && (

@@ -9,6 +9,8 @@ import { processQueryWithAI } from './services/pennyAIService'
 import { resetConversationContext } from './utils/pennyQueryProcessor'
 import pennyDataService from './services/pennyDataService'
 import { getRotatingExampleQuestions, PENNY_EXAMPLE_ROTATE_MS } from './constants/pennyExampleQuestions'
+import PasswordGate from './components/PasswordGate'
+import SyncStatusDashboard from './components/SyncStatusDashboard'
 
 // Confetti particle component
 function ConfettiParticle({ delay, duration, left, size, color }) {
@@ -70,34 +72,48 @@ function PennyInterface() {
   const [dataLoaded, setDataLoaded] = useState(false)
   const [companyNames, setCompanyNames] = useState([])
   const [employeeNames, setEmployeeNames] = useState([])
-  const [promptRotationIndex, setPromptRotationIndex] = useState(0)
-  const [randomExampleEmployeeName, setRandomExampleEmployeeName] = useState(null)
-  const [randomExampleCompanyName, setRandomExampleCompanyName] = useState(null)
-  const [randomExamplePartnershipName, setRandomExamplePartnershipName] = useState(null)
+  const [examplePrompts, setExamplePrompts] = useState([]) // Current 4 substituted prompts
+  const [fadingIdx, setFadingIdx] = useState(-1)            // Which slot is fading out (-1 = none)
+  const examplePoolRef = useRef({ startIdx: 0, empNames: [], compNames: [], partNames: [] })
+  const [showSyncDashboard, setShowSyncDashboard] = useState(false)
+  const bgClickTimesRef = useRef([])
   const inputRef = useRef(null)
   const messagesEndRef = useRef(null)
+  const lastUserMessageRef = useRef(null)
 
-  // Rotate "More questions" every 20 seconds (show 6 at a time)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setPromptRotationIndex(prev => prev + 1)
-    }, PENNY_EXAMPLE_ROTATE_MS)
-    return () => clearInterval(interval)
-  }, [])
-
-  // Pick a random employee, company, and partnership for example prompts (once data is loaded)
+  // Load name pools + build initial 4 prompts once data is loaded
   useEffect(() => {
     if (!dataLoaded) return
     Promise.all([
-      pennyDataService.getRandomEmployeeName(),
-      pennyDataService.getRandomCompanyName(),
-      pennyDataService.getRandomPartnershipName(),
-    ]).then(([employeeName, companyName, partnershipName]) => {
-      if (employeeName) setRandomExampleEmployeeName(employeeName)
-      if (companyName) setRandomExampleCompanyName(companyName)
-      if (partnershipName) setRandomExamplePartnershipName(partnershipName)
+      pennyDataService.getRandomEmployeeNames(20),
+      pennyDataService.getRandomCompanyNames(20),
+      pennyDataService.getRandomPartnershipNames(10),
+    ]).then(([empNames, compNames, partNames]) => {
+      examplePoolRef.current = { startIdx: 0, empNames, compNames, partNames }
+      setExamplePrompts(getRotatingExampleQuestions(0, empNames, compNames, partNames))
     })
   }, [dataLoaded])
+
+  // Rotate one random slot every PENNY_EXAMPLE_ROTATE_MS
+  useEffect(() => {
+    if (examplePrompts.length === 0) return
+    const interval = setInterval(() => {
+      const slot = Math.floor(Math.random() * examplePrompts.length)
+      setFadingIdx(slot)
+      setTimeout(() => {
+        const pool = examplePoolRef.current
+        pool.startIdx += examplePrompts.length // advance window so the new question is different
+        const fresh = getRotatingExampleQuestions(pool.startIdx, pool.empNames, pool.compNames, pool.partNames)
+        setExamplePrompts(prev => {
+          const next = [...prev]
+          next[slot] = fresh[slot]
+          return next
+        })
+        setFadingIdx(-1)
+      }, 300)
+    }, PENNY_EXAMPLE_ROTATE_MS)
+    return () => clearInterval(interval)
+  }, [examplePrompts.length])
 
   // Entrance animation types
   const entranceTypes = ['parachute', 'scooter', 'walk-right', 'vault', 'car', 'parasail']
@@ -165,9 +181,16 @@ function PennyInterface() {
     }
   }, [])
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll: scroll to the user's last message so their question stays visible at top
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (isTyping) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    } else if (lastUserMessageRef.current) {
+      // Small delay so the bot's response card is fully rendered before scrolling
+      requestAnimationFrame(() => {
+        lastUserMessageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
+    }
   }, [messages, isTyping])
 
   // Thinking Penny cursor while processing a query
@@ -383,8 +406,24 @@ function PennyInterface() {
 
   const hasMessages = messages.length > 0
 
+  // Secret gesture: 3 taps/clicks on the background within 2s opens Sync Status dashboard
+  const handleBackgroundClick = (e) => {
+    // Only count clicks directly on the background div (not bubbled from children)
+    if (e.target !== e.currentTarget) return
+    const now = Date.now()
+    bgClickTimesRef.current = [...bgClickTimesRef.current.filter(t => now - t < 2000), now]
+    if (bgClickTimesRef.current.length >= 3) {
+      bgClickTimesRef.current = []
+      setShowSyncDashboard(true)
+    }
+  }
+
+  if (showSyncDashboard) {
+    return <SyncStatusDashboard onClose={() => setShowSyncDashboard(false)} />
+  }
+
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800 flex items-center justify-center p-2 sm:p-4">
+    <div className="min-h-screen w-full bg-gradient-to-br from-purple-500 via-purple-600 to-indigo-700 flex items-center justify-center p-2 sm:p-4 relative penny-noise" onClick={handleBackgroundClick}>
       {/* Confetti layer */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         {confetti.map((particle) => (
@@ -392,10 +431,39 @@ function PennyInterface() {
         ))}
       </div>
 
-      {/* Main interface: chat card + optional expanded list panel */}
-      <div className={`flex items-stretch gap-0 w-full min-w-0 ${expandedList ? 'max-w-[95vw] overflow-hidden' : 'max-w-4xl'} justify-center animate-spotlight-enter mx-auto`}>
+      {/* Backdrop overlay — closes expanded list when clicking outside (desktop only; mobile uses full-screen overlay) */}
+      {expandedList && (
         <div
-          className={`relative flex-shrink-0 min-w-0 max-w-full ${expandedList ? 'w-full max-w-sm cursor-pointer' : 'w-full max-w-4xl'}`}
+          className="fixed inset-0 z-0 hidden sm:block"
+          onClick={() => setExpandedList(null)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Mobile full-screen overlay for expanded list */}
+      {expandedList && (
+        <div className="fixed inset-0 z-50 sm:hidden bg-white/95 backdrop-blur-xl flex flex-col">
+          <PennyListExpandedPanel
+            richContent={expandedList}
+            title={expandedList.title ?? 'Full list'}
+            onClose={() => setExpandedList(null)}
+            onEmployeeClick={(name) => {
+              handlePromptClick('Tell me about ' + name)
+              setExpandedList(null)
+            }}
+            onCompanyClick={(name) => {
+              handlePromptClick('Show company stats for ' + name)
+              setExpandedList(null)
+            }}
+            companyNames={companyNames}
+          />
+        </div>
+      )}
+
+      {/* Main interface: chat card + optional expanded list panel (side-by-side on desktop only) */}
+      <div className={`relative z-10 flex items-stretch gap-0 w-full min-w-0 ${expandedList ? 'sm:max-w-[95vw] sm:overflow-hidden max-w-4xl' : 'max-w-4xl'} justify-center animate-spotlight-enter mx-auto`}>
+        <div
+          className={`relative flex-shrink-0 min-w-0 max-w-full ${expandedList ? 'w-full sm:max-w-sm sm:cursor-pointer max-w-4xl' : 'w-full max-w-4xl'}`}
           onClick={expandedList ? () => setExpandedList(null) : undefined}
           role={expandedList ? 'button' : undefined}
           aria-label={expandedList ? 'Close full list and return to chat' : undefined}
@@ -404,16 +472,18 @@ function PennyInterface() {
           <div className="absolute -inset-4 bg-gradient-to-r from-purple-400/30 via-fuchsia-400/30 to-purple-400/30
                           rounded-3xl blur-2xl animate-pulse-slow" />
 
-          {/* Modal content */}
-          <div className={`relative bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl
-                          border border-purple-200/50 overflow-hidden flex flex-col max-h-[90vh] ${expandedList ? 'rounded-r-none' : ''}`}>
+          {/* Modal content — frosted glass */}
+          <div className={`relative bg-white/70 backdrop-blur-2xl rounded-2xl shadow-2xl
+                          border border-white/50 overflow-hidden flex flex-col max-h-[90vh] ${expandedList ? 'sm:rounded-r-none' : ''}`}>
+          {/* Top shine */}
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/70 to-transparent pointer-events-none" />
           {/* Inner glow */}
-          <div className="absolute inset-0 bg-gradient-to-b from-purple-50/50 to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-b from-white/30 to-transparent pointer-events-none" />
 
-          {/* Header with Penny */}
-          <div className="relative px-4 sm:px-6 pt-4 sm:pt-6 pb-3 flex-shrink-0">
+          {/* Header with Penny — compact on mobile when chatting */}
+          <div className={`relative px-4 sm:px-6 pt-4 sm:pt-6 flex-shrink-0 ${hasMessages ? 'pb-2' : 'pb-3'}`}>
             {/* Action buttons - positioned absolutely on the right */}
-            <div className="absolute right-4 sm:right-6 top-4 sm:top-6 flex items-center gap-2">
+            <div className={`absolute right-4 sm:right-6 flex items-center gap-2 ${hasMessages ? 'top-2 sm:top-4' : 'top-4 sm:top-6'}`}>
               {hasMessages && (
                 <button
                   onClick={startNewConversation}
@@ -439,8 +509,17 @@ function PennyInterface() {
               )}
             </div>
 
-            {/* Centered Penny and title */}
-            <div className="flex flex-col items-center justify-center">
+            {/* Compact chat header — visible when chatting (replaces big avatar) */}
+            {hasMessages && (
+              <div className="flex items-center gap-2 py-1">
+                <PennyAvatar size={28} id="main-compact" />
+                <span className="text-sm font-semibold text-slate-800">Penny</span>
+                <span className="text-xs text-slate-400">CS and Delivery Assistant</span>
+              </div>
+            )}
+
+            {/* Centered Penny and title — hidden when in chat */}
+            <div className={`flex flex-col items-center justify-center ${hasMessages ? 'hidden' : ''}`}>
               <div className={`relative mb-2 animate-penny-${entranceType}-in`}>
                 <div className="absolute -inset-3 bg-purple-400/20 rounded-full blur-md animate-pulse" />
 
@@ -546,7 +625,7 @@ function PennyInterface() {
                 </div>
               </div>
               <h2 className="text-2xl font-semibold text-slate-800">Hi, I'm Penny!</h2>
-              <p className="text-sm text-slate-500">Your AI-powered assistant</p>
+              <p className="text-sm text-slate-500">CS and Delivery Assistant</p>
             </div>
           </div>
 
@@ -577,21 +656,26 @@ function PennyInterface() {
                 </div>
               ) : (
                 <div className="py-3 pb-4 space-y-4">
-                  {messages.map((message) => (
-                    <PennyMessage
-                      key={message.id}
-                      message={message}
-                      onAction={handleAction}
-                      onExpandList={(list) => {
-                        document.body.classList.add('penny-thinking-cursor')
-                        setExpandedList(list)
-                      }}
-                      companyNames={companyNames}
-                      employeeNames={employeeNames}
-                      onEmployeeClick={(name) => handlePromptClick('Tell me about ' + name)}
-                      onCompanyClick={(name) => handlePromptClick('Show company stats for ' + name)}
-                    />
-                  ))}
+                  {messages.map((message, idx) => {
+                    // Attach ref to the last user message so we scroll to their question
+                    const isLastUser = message.type === 'user' && !messages.slice(idx + 1).some(m => m.type === 'user')
+                    return (
+                      <div key={message.id} ref={isLastUser ? lastUserMessageRef : undefined}>
+                        <PennyMessage
+                          message={message}
+                          onAction={handleAction}
+                          onExpandList={(list) => {
+                            document.body.classList.add('penny-thinking-cursor')
+                            setExpandedList(list)
+                          }}
+                          companyNames={companyNames}
+                          employeeNames={employeeNames}
+                          onEmployeeClick={(name) => handlePromptClick('Tell me about ' + name)}
+                          onCompanyClick={(name) => handlePromptClick('Show company stats for ' + name)}
+                        />
+                      </div>
+                    )
+                  })}
                   {isTyping && <PennyTypingIndicator />}
                   <div ref={messagesEndRef} />
                 </div>
@@ -608,8 +692,8 @@ function PennyInterface() {
                 <div className="absolute -inset-1 bg-gradient-to-r from-purple-400 via-fuchsia-400 to-purple-400
                                 rounded-xl opacity-0 group-focus-within:opacity-50 blur-md transition-opacity duration-300" />
 
-                <div className="relative flex items-center bg-white rounded-xl border-2 border-slate-200
-                                group-focus-within:border-purple-400 shadow-sm group-focus-within:shadow-lg
+                <div className="relative flex items-center bg-white/60 backdrop-blur-lg rounded-2xl border border-white/70
+                                group-focus-within:border-purple-300/80 shadow-sm group-focus-within:shadow-purple-300/25
                                 transition-all duration-300">
                   <input
                     ref={inputRef}
@@ -617,68 +701,71 @@ function PennyInterface() {
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder={hasMessages ? "Ask a follow-up question..." : "Ask me anything..."}
-                    className="flex-1 px-5 py-2.5 text-sm bg-transparent outline-none text-slate-800
+                    className="flex-1 px-5 py-3 text-sm bg-transparent outline-none text-slate-800
                                placeholder:text-slate-400"
                     disabled={isTyping}
                   />
                   <button
                     type="submit"
                     disabled={!query.trim() || isTyping}
-                    className="mr-2 p-2 bg-gradient-to-r from-purple-500 to-fuchsia-500
-                               hover:from-purple-600 hover:to-fuchsia-600
+                    className="mr-2 p-2.5 bg-gradient-to-r from-purple-500 to-fuchsia-500
+                               hover:from-purple-400 hover:to-fuchsia-400
                                disabled:from-slate-300 disabled:to-slate-300
-                               text-white rounded-lg transition-all duration-200
-                               disabled:cursor-not-allowed"
+                               text-white rounded-xl transition-all duration-200
+                               disabled:cursor-not-allowed shadow-md shadow-purple-500/20
+                               hover:shadow-lg hover:shadow-purple-500/30"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                            d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
+                            d="M6 12h12m0 0l-5-5m5 5l-5 5" />
                     </svg>
                   </button>
                 </div>
               </div>
             </form>
 
-            {/* Sample prompts below search */}
-            {!showHistory && (
+            {/* Sample prompts below search — hidden when in chat */}
+            {!showHistory && !hasMessages && examplePrompts.length > 0 && (
               <div className="mt-3">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                  {hasMessages ? 'More questions' : 'Try asking'}
+                  Try asking
                 </p>
-                <div className="grid grid-cols-2 gap-2">
-                  {getRotatingExampleQuestions(promptRotationIndex, randomExampleEmployeeName, randomExampleCompanyName, randomExamplePartnershipName).map((prompt, idx) => (
+                <div className="grid grid-cols-2 gap-2.5">
+                  {examplePrompts.map((prompt, idx) => (
                     <button
-                      key={`${promptRotationIndex}-${idx}-${prompt.text}`}
+                      key={`slot-${idx}`}
                       onClick={() => handlePromptClick(prompt.text)}
                       disabled={isTyping}
+                      style={{ opacity: fadingIdx === idx ? 0 : 1, transition: 'opacity 0.3s ease-in-out' }}
                       className="
-                        flex items-start gap-2 px-3 py-2
-                        bg-gray-50 hover:bg-purple-50
-                        border border-gray-200 hover:border-purple-200
-                        rounded-lg text-gray-700 hover:text-purple-700
-                        transition-colors duration-150
+                        flex items-start gap-2 px-3 py-2.5
+                        bg-white/40 hover:bg-white/60
+                        border border-white/50 hover:border-purple-200/60
+                        backdrop-blur-sm
+                        rounded-xl text-gray-700 hover:text-purple-700
                         text-left
                         disabled:opacity-50 disabled:cursor-not-allowed
                       "
                     >
-                      <span className="text-sm flex-shrink-0">{prompt.icon}</span>
-                      <span className="line-clamp-2 text-xs leading-snug">{prompt.displayText ?? prompt.text}</span>
+                      <span className="text-sm flex-shrink-0 mt-0.5">{prompt.icon}</span>
+                      <span className="line-clamp-2 text-xs leading-relaxed">{prompt.displayText ?? prompt.text}</span>
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Keyboard hint */}
-            <p className="mt-2 text-center text-[10px] text-slate-400">
+            {/* Keyboard hint — desktop only */}
+            <p className="mt-2 text-center text-[10px] text-slate-400 hidden sm:block">
               Press <kbd className="px-1 py-0.5 bg-slate-100 rounded text-slate-500 font-mono text-[10px]">Enter</kbd> to ask
             </p>
           </div>
         </div>
         </div>
 
+        {/* Desktop side panel (hidden on mobile — mobile uses full-screen overlay above) */}
         {expandedList && (
-          <div className="flex-1 min-w-[min(18rem,45vw)] max-w-[70vw] max-h-[85vh] rounded-r-2xl overflow-hidden border border-l-0 border-purple-200/50 shadow-2xl bg-white">
+          <div className="hidden sm:block flex-1 min-w-[min(18rem,45vw)] max-w-[70vw] max-h-[85vh] rounded-r-2xl overflow-hidden border border-l-0 border-white/50 shadow-2xl bg-white/70 backdrop-blur-2xl">
             <PennyListExpandedPanel
               richContent={expandedList}
               title={expandedList.title ?? 'Full list'}
@@ -753,6 +840,14 @@ function PennyInterface() {
 }
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    () => sessionStorage.getItem('penny_auth') === 'true'
+  )
+
+  if (!isAuthenticated) {
+    return <PasswordGate onAuthenticated={() => setIsAuthenticated(true)} />
+  }
+
   return (
     <PennyChatProvider>
       <Router>
