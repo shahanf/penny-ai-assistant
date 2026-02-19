@@ -8,8 +8,13 @@
 
 import { neon } from '@neondatabase/serverless';
 
-const OLD_URL = 'postgresql://neondb_owner:npg_vneZdsD9Pct7@ep-purple-lab-airsznak-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require';
-const NEW_URL = 'postgresql://neondb_owner:npg_1WG3RlCPwTFy@ep-super-water-akxgh2ki-pooler.c-3.us-west-2.aws.neon.tech/neondb?sslmode=require';
+// Set these environment variables before running: OLD_DATABASE_URL, NEW_DATABASE_URL
+const OLD_URL = process.env.OLD_DATABASE_URL;
+const NEW_URL = process.env.NEW_DATABASE_URL;
+if (!OLD_URL || !NEW_URL) {
+  console.error('Error: Set OLD_DATABASE_URL and NEW_DATABASE_URL environment variables');
+  process.exit(1);
+}
 
 const oldSql = neon(OLD_URL);
 const newSql = neon(NEW_URL);
