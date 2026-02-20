@@ -81,6 +81,54 @@ function PennyInterface() {
   const messagesEndRef = useRef(null)
   const lastUserMessageRef = useRef(null)
 
+  // ── Browser back button / swipe-back support ──
+  // Push virtual history entries when entering chat or opening the list panel,
+  // so swiping back steps through: list → chat → welcome screen (instead of leaving the app).
+  const historyDepthRef = useRef(0) // how many virtual entries we've pushed
+
+  // Push a virtual history entry
+  const pushHistoryState = (state) => {
+    window.history.pushState(state, '')
+    historyDepthRef.current += 1
+  }
+
+  // When messages first appear (user starts chatting), push a history entry
+  const prevHasMessages = useRef(false)
+  useEffect(() => {
+    const has = messages.length > 0
+    if (has && !prevHasMessages.current) {
+      pushHistoryState({ penny: 'chat' })
+    }
+    prevHasMessages.current = has
+  }, [messages.length])
+
+  // When expanded list opens, push a history entry
+  useEffect(() => {
+    if (expandedList) {
+      pushHistoryState({ penny: 'list' })
+    }
+  }, [expandedList])
+
+  // Listen for popstate (back swipe / back button)
+  useEffect(() => {
+    const handlePopState = (e) => {
+      if (historyDepthRef.current <= 0) return // no virtual entries left, let browser handle it
+
+      historyDepthRef.current -= 1
+
+      // Step back through states: list → chat → welcome
+      if (expandedList) {
+        setExpandedList(null)
+      } else if (messages.length > 0) {
+        setMessages([])
+        resetConversationContext()
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [expandedList, messages.length])
+
   // Load name pools + build initial 4 prompts once data is loaded
   useEffect(() => {
     if (!dataLoaded) return
@@ -249,6 +297,9 @@ function PennyInterface() {
     const queryText = query.trim()
     if (!queryText) return
 
+    // Dismiss mobile keyboard
+    inputRef.current?.blur()
+
     const userMessage = { id: Date.now(), type: 'user', content: queryText }
     setMessages(prev => [...prev, userMessage])
     setQuery('')
@@ -289,6 +340,7 @@ function PennyInterface() {
   }
 
   const handlePromptClick = (promptText, fromSuggestion = false) => {
+    inputRef.current?.blur() // dismiss mobile keyboard
     setQuery(promptText)
     setTimeout(() => {
       const userMessage = { id: Date.now(), type: 'user', content: promptText }
